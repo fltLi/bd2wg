@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    ".", 
+    "proc-macro/action"
+]
+
+[workspace.dependencies]
+thiserror = "2"
+paste = "1"
+
+[package]
+name = "bd2wg"
+author = "fltLi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+action = { path = "proc-macro/action" }
+paste = { workspace = true }
+thiserror = { workspace = true }
+strum = { version = "*", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+serde_with = "3"
+reqwest = { version = "*", features = ["stream"] }
+tokio = { version = "1", features = ["full"] }
+futures-util = "*"
