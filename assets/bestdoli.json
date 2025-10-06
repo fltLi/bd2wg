@@ -1,0 +1,6 @@
+{
+    "bundle_root": "https://bestdori.com/assets/jp/",
+    "bgm_bundle": "sound/scenario/bgm/",
+    "se_common": "https://bestdori.com/res/CommonSE/",
+    "live2d_bundle": "live2d/chara/"
+}
