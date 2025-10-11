@@ -1,6 +1,6 @@
 # bd2wg
 
-Bestdori $\rarr$ WebGAL 转换器.
+Bestdori -> WebGAL 转换器.
 
 bd2wg 能将 Bestdori 脚本转译为 WebGAL 脚本, 并**自动下载相关资源**, 构建 WebGAL 项目.
 
@@ -28,7 +28,7 @@ bd2wg 能将 Bestdori 脚本转译为 WebGAL 脚本, 并**自动下载相关资�
 
 > [!NOTE]
 >
-> 如果您是从 故事$\rarr$导出 获取的脚本, 直接保存即可.
+> 如果您是从 故事 -> 导出 获取的脚本, 直接保存即可.
 >
 > 如果您是通过爬取已发布的故事获取的脚本, 请仅保留 `storySource` 下的内容.
 
@@ -58,7 +58,7 @@ bd2wg 使用 **100% Rust** 编写, 分为三个模块:
 
   下属 `models` 包含 Bestdori, WebGAL 等数据结构, `pipeline` 为工作流程定义和实现.
 
-  `pipeline` 分为 反序列化$\rarr$预处理+资源解析$\rarr$下载+转译$\rarr$打包 共 6 个抽象, 默认实现均可替换.
+  `pipeline` 分为 反序列化 -> 预处理+资源解析 -> 下载+转译 -> 打包 共 6 个抽象, 默认实现均可替换.
 
 - `bd2wg-cli`:  简单的终端交互.
 
