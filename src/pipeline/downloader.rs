@@ -1,4 +1,4 @@
-//! bestdoli 资源下载
+//! bestdori 资源下载
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -19,14 +19,14 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::Deserialize;
 use tokio::{io::AsyncWriteExt, runtime::Runtime, sync::Semaphore, time::timeout};
 
-/// bestdoli 资源下载器
+/// Bestdori 资源下载器
 ///
-/// - 创建和执行下载任务不阻塞主线程
-/// - 先创建的任务先启动
-/// - - 普通任务的启动指开始执行下载
-/// - - 捆绑任务的启动指开始执行初始 url 的下载
-/// - 延迟任务只有在没有下载中的非捆绑任务时才启动并加入列表
-/// - 下载器不会在一个回调返回前调用另一个回调
+/// 说明：
+/// - 非阻塞调度：所有下载任务通过内部线程与 tokio 运行时执行，调度操作对调用线程不阻塞。
+/// - 有界并发：同时活跃的下载任务由 semaphore 限制（常量 DOWNLOAD_TASK_LIMIT）。队列本身无界。
+/// - 支持绑定下载：使用 download_bind() 将对一个 URL 的字节回调为多个 Resource（回调在单独线程串行执行以保证同步回调安全）。
+/// - 错误记录：下载过程中产生的错误会被收集到内部状态，通过 take_error() 提取并清空。
+/// - 自动重试与超时：网络请求和写文件操作在每次尝试中有超时保护（常量 DOWNLOAD_TIMEOUT_SECS），并在遇到超时或暂时性错误时自动重试，重试次数由 DOWNLOAD_RETRY_TIMES 控制。
 pub trait Downloader {
     /// 启动一个下载任务
     fn download(&mut self, resource: &Resource) -> Result<()>;
@@ -35,11 +35,6 @@ pub trait Downloader {
     ///
     /// 获取 url 对应文件的字节, 传入回调函数生成资源列表.
     fn download_bind<F: BindTask>(&mut self, url: &str, task: F) -> Result<()>;
-
-    /// 启动一个延迟任务 (不立即生成 Resource) (已弃用)
-    ///
-    /// 为什么弃用还留着? 应对 motion 与 expression 对应链接格式变化的情况.
-    fn download_lazy<F: LazyTask>(&mut self, task: F) -> Result<()>;
 
     /// 等待所有下载任务完成 (不关闭下载器)
     fn wait(&self) -> Result<()>;
@@ -99,10 +94,6 @@ enum DownloadCommand {
         url: String,
         cb: Box<dyn Fn(Vec<u8>) -> Vec<Resource> + Send + 'static>,
     },
-    /// 延迟任务：当可以启动延迟任务时，worker 会调用 cb() 生成 Resource 并入队 Task
-    Lazy {
-        cb: Box<dyn Fn() -> Resource + Send + 'static>,
-    },
     Shutdown,
 }
 
@@ -115,7 +106,7 @@ struct DownloaderState {
     error: Vec<DownloadError>,
 }
 
-/// 默认 bestdoli 资源下载器
+/// 默认 bestdori 资源下载器
 pub struct DefaultDownloader {
     root: String,
     sender: mpsc::Sender<DownloadCommand>,
@@ -308,15 +299,9 @@ impl DefaultDownloader {
                             state_guard.task_count += 1;
                         }
 
-                        // 执行下载任务，使用超时保护；download_resource 直接返回 DownloadError，便于用 `?` 传播
-                        let fut = Self::download_resource(&client, &url_clone, &path_clone);
-                        let timed = timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS), fut).await;
-
-                        // 将 tokio::time::Elapsed 映射为 DownloadError::Timeout
-                        let result: std::result::Result<(), DownloadError> = match timed {
-                            Ok(inner) => inner,
-                            Err(_) => Err(DownloadErrorKind::Timeout.into()),
-                        };
+                        // 执行下载任务（download_resource 内部实现会对每次尝试做超时与重试）
+                        let result: std::result::Result<(), DownloadError> =
+                            Self::download_resource(&client, &url_clone, &path_clone).await;
 
                         // 记录可能出现的错误并减少计数；将 URL/path 上下文一并记录
                         let (lock, cvar) = &*state;
@@ -363,28 +348,44 @@ impl DefaultDownloader {
                             state_guard.task_count += 1;
                         }
 
-                        // 执行获取字节的请求
+                        // 执行获取字节的请求，带超时与重试
                         let mut maybe_bytes: Option<Vec<u8>> = None;
                         let mut maybe_error: Option<DownloadError> = None;
 
-                        match client.get(&url_clone).send().await {
-                            Ok(resp) => {
-                                if !resp.status().is_success() {
-                                    maybe_error =
-                                        Some(DownloadErrorKind::HttpStatus(resp.status()).into());
-                                } else {
-                                    match resp.bytes().await {
-                                        Ok(bytes) => {
-                                            maybe_bytes = Some(bytes.to_vec());
+                        for _attempt in 0..DOWNLOAD_RETRY_TIMES {
+                            // 把整个请求+读取 bytes 的过程放进 timeout 中
+                            let attempt_res: std::result::Result<Vec<u8>, DownloadError> =
+                                match timeout(
+                                    Duration::from_secs(DOWNLOAD_TIMEOUT_SECS as u64),
+                                    async {
+                                        let resp = client.get(&url_clone).send().await?;
+                                        if !resp.status().is_success() {
+                                            return Err(DownloadErrorKind::HttpStatus(
+                                                resp.status(),
+                                            )
+                                            .into());
                                         }
-                                        Err(e) => {
-                                            maybe_error = Some(e.into());
-                                        }
-                                    }
+                                        let bytes = resp.bytes().await?;
+                                        Ok(bytes.to_vec())
+                                    },
+                                )
+                                .await
+                                {
+                                    Ok(Ok(bytes)) => Ok(bytes),
+                                    Ok(Err(e)) => Err(e),
+                                    Err(_) => Err(DownloadErrorKind::Timeout.into()),
+                                };
+
+                            match attempt_res {
+                                Ok(bytes) => {
+                                    maybe_bytes = Some(bytes);
+                                    break;
                                 }
-                            }
-                            Err(e) => {
-                                maybe_error = Some(e.into());
+                                Err(e) => {
+                                    maybe_error = Some(e);
+                                    // small backoff before retry
+                                    tokio::time::sleep(Duration::from_millis(200)).await;
+                                }
                             }
                         }
 
@@ -417,34 +418,8 @@ impl DefaultDownloader {
                     });
                 }
 
-                DownloadCommand::Lazy { cb } => {
-                    // 延迟任务：只有当没有活跃非捆绑任务且绑定队列为空且没有 bind_active_count 时才调用 cb
-                    let sender_clone = sender.clone();
-                    let state_clone = state.clone();
-                    let bind_q_len = bind_queue_len.load(Ordering::SeqCst);
-
-                    // 检查当前活跃任务计数与 bind 队列/活动绑定
-                    {
-                        let (lock, _cvar) = &*state_clone;
-                        let state_guard = lock.lock().unwrap();
-                        if state_guard.task_count > 0
-                            || state_guard.bind_active_count > 0
-                            || bind_q_len > 0
-                        {
-                            // 重新入队到末尾以保持 FIFO
-                            let _ = sender_clone.send(DownloadCommand::Lazy { cb });
-                            continue;
-                        }
-                    }
-
-                    // 条件满足，安全调用 cb 生成 resource 并将 Task 入队
-                    let resource = (cb)();
-                    let _ = sender_clone.send(DownloadCommand::Task {
-                        url: resource.url.clone().unwrap_or_default(),
-                        path: root.clone() + resource.get_full_path().as_str(),
-                    });
-                }
-
+                /* Lazy tasks removed: callers should either produce Resource and call download(),
+                or use download_bind() to fetch bytes and produce Resource list. */
                 DownloadCommand::Shutdown => {
                     // 标记关闭并等待在飞任务完成后再退出 worker
                     let mut state_guard = state_lock.lock().unwrap();
@@ -465,32 +440,49 @@ impl DefaultDownloader {
         url: &str,
         path: &str,
     ) -> std::result::Result<(), DownloadError> {
-        // 发起请求
-        let response = client.get(url).send().await?;
+        // 自动重试：在 DOWNLOAD_RETRY_TIMES 次尝试内处理超时/网络错误
+        let mut last_err: Option<DownloadError> = None;
+        for _attempt in 0..DOWNLOAD_RETRY_TIMES {
+            // 每次尝试都在超时保护下执行完整的请求+写入流程
+            let attempt = timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS as u64), async {
+                let response = client.get(url).send().await?;
+                if !response.status().is_success() {
+                    return Err(DownloadErrorKind::HttpStatus(response.status()).into());
+                }
 
-        // 非 2xx 状态视作错误
-        if !response.status().is_success() {
-            return Err(DownloadErrorKind::HttpStatus(response.status()).into());
+                // 确保目标目录存在
+                if let Some(parent) = Path::new(path).parent()
+                    && !parent.as_os_str().is_empty()
+                {
+                    match tokio::fs::create_dir_all(parent).await {
+                        Ok(_) => {}
+                        Err(e) => return Err(e.into()),
+                    }
+                }
+
+                // 创建目标文件并写入
+                let mut file = tokio::fs::File::create(path).await?;
+                let mut stream = response.bytes_stream();
+                while let Some(chunk_res) = stream.next().await {
+                    let chunk = chunk_res?;
+                    file.write_all(&chunk).await?;
+                }
+
+                Ok(()) as std::result::Result<(), DownloadError>
+            })
+            .await;
+
+            match attempt {
+                Ok(Ok(())) => return Ok(()),
+                Ok(Err(e)) => last_err = Some(e),
+                Err(_) => last_err = Some(DownloadErrorKind::Timeout.into()),
+            }
+
+            // 小的退避：避免立即重试打穿远端
+            tokio::time::sleep(Duration::from_millis(200)).await;
         }
 
-        // 确保目标目录存在
-        if let Some(parent) = Path::new(path).parent()
-            && !parent.as_os_str().is_empty()
-        {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-
-        // 创建目标文件
-        let mut file = tokio::fs::File::create(path).await?;
-
-        // 流式写入响应体到文件，分块处理以节省内存
-        let mut stream = response.bytes_stream();
-        while let Some(chunk_res) = stream.next().await {
-            let chunk = chunk_res?;
-            file.write_all(&chunk).await?;
-        }
-
-        Ok(())
+        Err(last_err.unwrap_or_else(|| DownloadErrorKind::Unexpected("unknown".into()).into()))
     }
 
     /// 获取当前任务数量
@@ -567,21 +559,6 @@ impl Downloader for DefaultDownloader {
                 Error::Download(
                     DownloadErrorKind::SendError(format!(
                         "Failed to enqueue download callback task: {e}"
-                    ))
-                    .into(),
-                )
-            })
-    }
-
-    fn download_lazy<F: LazyTask>(&mut self, task: F) -> Result<()> {
-        let boxed = Box::new(task);
-
-        self.sender
-            .send(DownloadCommand::Lazy { cb: boxed })
-            .map_err(|e| {
-                Error::Download(
-                    DownloadErrorKind::SendError(format!(
-                        "Failed to enqueue download lazy task: {e}"
                     ))
                     .into(),
                 )

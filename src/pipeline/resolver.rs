@@ -1,4 +1,4 @@
-//! bestdoli 资源解析
+//! bestdori 资源解析
 
 use std::collections::{HashMap, HashSet, hash_map::Entry};
 use std::fs::File;
@@ -12,7 +12,7 @@ use super::definition::*;
 use crate::constant::*;
 use crate::error::*;
 use crate::models::{
-    bestdoli::{Address, AddressPath, AddressType},
+    bestdori::{Address, AddressPath, AddressType},
     live2d::{self, Bundle, Model, ModelBundle},
 };
 
@@ -41,7 +41,7 @@ pub enum ResolveModelResult {
     Existing,
 }
 
-/// bestdoli 资源解析器
+/// bestdori 资源解析器
 ///
 /// - 在 Purify 过程中, Resolver 收集资源并规范资源路径
 /// - 在 Extractor 过程中, Resolver 将引导 Live2D 支持
@@ -96,7 +96,7 @@ fn url_to_filepath(url: &str, extend: &str) -> String {
 
 /// 默认解析器配置
 #[derive(Deserialize)]
-pub struct BestdoliConfig {
+pub struct BestdoriConfig {
     pub bundle_root: String,
     pub bgm_bundle: String,
     pub se_common: String,
@@ -143,7 +143,7 @@ impl Default for ModelRecord {
     }
 }
 
-/// 默认 bestdoli 资源解析器
+/// 默认 bestdori 资源解析器
 ///
 /// 设计原因, 目前 motion 和 expression 不能是特殊服装.  
 /// 那么如何解决这个问题呢? 记录一个 character -> model 的上下文并启用 download_lazy.
@@ -151,7 +151,7 @@ impl Default for ModelRecord {
 /// $\uarr$ 最后还是维护了啊...
 pub struct DefaultResolver {
     root: String,
-    config: BestdoliConfig,
+    config: BestdoriConfig,
     common: CommonRecord, // 常规记录
     model: ModelRecord,   // 模型记录
     error: Arc<Mutex<Vec<ResolveError>>>,
@@ -166,7 +166,7 @@ impl DefaultResolver {
         ))
     }
 
-    pub fn with_config(root: String, config: BestdoliConfig) -> Self {
+    pub fn with_config(root: String, config: BestdoriConfig) -> Self {
         Self {
             root,
             config,

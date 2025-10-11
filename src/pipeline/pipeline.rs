@@ -9,7 +9,7 @@ use std::thread;
 use super::*;
 use crate::constant::WEBGAL_START_SCENE;
 use crate::error::*;
-use crate::models::bestdoli::{self, Story};
+use crate::models::bestdori::{self, Story};
 
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumString, strum::Display)]
 pub enum Procedure {

@@ -6,7 +6,7 @@ use std::iter::Peekable;
 use super::definition::*;
 use crate::error::*;
 use crate::models::{
-    bestdoli::{LayoutSide, LayoutSideType, LayoutType, Motion},
+    bestdori::{LayoutSide, LayoutSideType, LayoutType, Motion},
     internal::{self, *},
     webgal::{self, *},
 };
@@ -52,7 +52,7 @@ struct Model {
     expression: Option<String>,
 }
 
-/// 默认 bestdoli -> webgal 转译器
+/// 默认 bestdori -> webgal 转译器
 pub struct DefaultTranspiler<I>
 where
     I: Iterator<Item = internal::Action>,

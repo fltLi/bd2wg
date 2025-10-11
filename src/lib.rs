@@ -10,11 +10,12 @@ pub mod constant {
     //! bd2wg 常量定义
 
     pub const DOWNLOAD_HEADER: &str = "./assets/header.json";
-    pub const RESOLVE_CONFIG: &str = "./assets/bestdoli.json";
+    pub const RESOLVE_CONFIG: &str = "./assets/bestdori.json";
     pub const WEBGAL_START_SCENE: &str = "start.txt";
     pub const WEBGAL_LIVE2D_VERSION: &str = "Sample 1.0.0";
     pub const DOWNLOAD_TASK_LIMIT: usize = 32;
-    pub const DOWNLOAD_TIMEOUT_SECS: u64 = 24;
+    pub const DOWNLOAD_TIMEOUT_SECS: usize = 24;
+    pub const DOWNLOAD_RETRY_TIMES: usize = 3;
 }
 
 pub mod error {
@@ -22,7 +23,7 @@ pub mod error {
 
     use std::fmt;
 
-    use crate::models::bestdoli::Address;
+    use crate::models::bestdori::Address;
 
     /// 通用返回类型
     pub type Result<T> = std::result::Result<T, Error>;

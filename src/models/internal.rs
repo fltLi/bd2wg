@@ -1,6 +1,6 @@
 //! bd2wg 内部数据结构
 
-use super::bestdoli::{EffectDetail, LayoutSide, LayoutSideType, LayoutType, Motion};
+use super::bestdori::{EffectDetail, LayoutSide, LayoutSideType, LayoutType, Motion};
 
 /// 内部脚本
 #[derive(Debug, Clone)]

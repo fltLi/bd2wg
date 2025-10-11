@@ -5,7 +5,7 @@ use std::fmt::{self, Display};
 use action::Actionable;
 use serde::Serialize;
 
-use crate::models::bestdoli::LayoutSideType;
+use crate::models::bestdori::LayoutSideType;
 
 /// webgal 命令标记特型
 pub trait Actionable: Display {}

@@ -1,4 +1,4 @@
-//! bestdoli 脚本预处理
+//! bestdori 脚本预处理
 
 use std::collections::VecDeque;
 use std::rc::Rc;
@@ -7,7 +7,7 @@ use super::definition::*;
 use super::resolver::{ResolveCommonResult, ResolveModelResult, Resolver};
 use crate::error::*;
 use crate::models::{
-    bestdoli::{self, *},
+    bestdori::{self, *},
     internal::{self, *},
 };
 
@@ -29,16 +29,16 @@ pub enum PurifyResult {
 //     }
 // }
 
-/// bestdoli 脚本预处理器
+/// bestdori 脚本预处理器
 ///
-/// - 将 bestdoli 脚本中的资源转换为内部表示
+/// - 将 bestdori 脚本中的资源转换为内部表示
 /// - 收集并转换资源, 创建下载任务, 收集 Resolver 需要的数据
 pub trait Purifier: Iterator<Item = Result<PurifyResult>> {}
 
-/// 默认 bestdoli 脚本预处理器
+/// 默认 bestdori 脚本预处理器
 pub struct DefaultPurifier<'a, I, R>
 where
-    I: Iterator<Item = bestdoli::Action>,
+    I: Iterator<Item = bestdori::Action>,
     R: Resolver,
 {
     in_iter: I,
@@ -48,7 +48,7 @@ where
 
 impl<'a, I, R> DefaultPurifier<'a, I, R>
 where
-    I: Iterator<Item = bestdoli::Action>,
+    I: Iterator<Item = bestdori::Action>,
     R: Resolver,
 {
     /// 创建一个新的预处理器
@@ -61,16 +61,16 @@ where
     }
 
     /// 处理一条指令
-    fn purify(&mut self, action: bestdoli::Action) -> Vec<Result<PurifyResult>> {
+    fn purify(&mut self, action: bestdori::Action) -> Vec<Result<PurifyResult>> {
         let mut items: Vec<Result<PurifyResult>> = Vec::new();
 
         match action {
-            bestdoli::Action::Talk(talk) => items.extend(self.purify_talk(talk)),
-            bestdoli::Action::Sound(sound) => items.extend(self.purify_sound(sound)),
-            bestdoli::Action::Motion(motion) => items.extend(self.purify_motion(motion)),
-            bestdoli::Action::Layout(layout) => items.extend(self.purify_layout(layout)),
-            bestdoli::Action::Effect(effect) => items.extend(self.purify_effect(effect)),
-            bestdoli::Action::Unknown => items.extend(self.purify_unknown()),
+            bestdori::Action::Talk(talk) => items.extend(self.purify_talk(talk)),
+            bestdori::Action::Sound(sound) => items.extend(self.purify_sound(sound)),
+            bestdori::Action::Motion(motion) => items.extend(self.purify_motion(motion)),
+            bestdori::Action::Layout(layout) => items.extend(self.purify_layout(layout)),
+            bestdori::Action::Effect(effect) => items.extend(self.purify_effect(effect)),
+            bestdori::Action::Unknown => items.extend(self.purify_unknown()),
         }
 
         items
@@ -207,11 +207,11 @@ where
 
     fn purify_motion(
         &mut self,
-        bestdoli::MotionAction {
+        bestdori::MotionAction {
             wait,
             model,
             motion,
-        }: bestdoli::MotionAction,
+        }: bestdori::MotionAction,
     ) -> Vec<Result<PurifyResult>> {
         let mut items: Vec<Result<PurifyResult>> = Vec::new();
         let mut model = model;
@@ -391,14 +391,14 @@ where
 
 impl<'a, I, R> Purifier for DefaultPurifier<'a, I, R>
 where
-    I: Iterator<Item = bestdoli::Action>,
+    I: Iterator<Item = bestdori::Action>,
     R: Resolver,
 {
 }
 
 impl<'a, I, R> Iterator for DefaultPurifier<'a, I, R>
 where
-    I: Iterator<Item = bestdoli::Action>,
+    I: Iterator<Item = bestdori::Action>,
     R: Resolver,
 {
     type Item = Result<PurifyResult>;
