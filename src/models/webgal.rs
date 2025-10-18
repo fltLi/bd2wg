@@ -294,7 +294,7 @@ fn test_webgal_serialize() {
         next: true,
     };
 
-    assert_eq!(choose.to_string(), r#"choose:start.txt|???"#);
+    assert_eq!(choose.to_string(), r#"choose:???:start.txt"#);
 
     assert_eq!(
         say.to_string(),
@@ -315,3 +315,4 @@ fn test_webgal_serialize() {
         r#"setAnimation:rgbFilm -target=bg-main -next"#
     );
 }
+
