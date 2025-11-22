@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/bd2wg", 
+    "crates/bd2wg-cli", 
+    "crates/derive-webgal"
+]
+
+[workspace.package]
+author = "fltLi"
+version = "1.0.0"
+edition = "2024"
+license = "GPL-3.0"
+
+[workspace.dependencies]
+paste = "1"
+thiserror = "2"
+once_cell = "1"
+derive_builder = "*"
+strum = "*"
+strum_macros = "*"
+serde = { version = "1", features = ["derive"] }
+serde_with = "3"
+serde_json = "1"
