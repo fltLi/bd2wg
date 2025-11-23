@@ -1,14 +1,10 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! bd2wg 业务逻辑
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#![allow(dead_code, unused_imports, unused_macros)]
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod error;
+pub mod models;
+pub mod traits;
+pub mod utils;
+
+pub use error::*;
