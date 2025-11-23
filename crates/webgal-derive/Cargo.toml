@@ -1,8 +1,9 @@
 [package]
-name = "derive-webgal"
+name = "webgal-derive"
+version = "1.0.0"
 author.workspace = true
-version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+webgal-derive-macro = { path = "../webgal-derive-macro" }

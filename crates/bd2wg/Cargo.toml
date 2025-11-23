@@ -1,8 +1,17 @@
 [package]
 name = "bd2wg"
+version = "1.0.0"
 author.workspace = true
-version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+webgal-derive = { path = "../webgal-derive" }
+webgal-derive-macro = { path = "../webgal-derive-macro" }
+paste.workspace = true
+thiserror.workspace = true
+derive_builder.workspace = true
+strum.workspace = true
+strum_macros.workspace = true
+serde.workspace = true
+serde_json.workspace = true

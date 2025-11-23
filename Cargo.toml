@@ -3,7 +3,8 @@ resolver = "2"
 members = [
     "crates/bd2wg", 
     "crates/bd2wg-cli", 
-    "crates/derive-webgal"
+    "crates/webgal-derive", 
+    "crates/webgal-derive-macro"
 ]
 
 [workspace.package]
