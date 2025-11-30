@@ -5,7 +5,7 @@ use std::fmt::{self, Display};
 use serde::Serialize;
 use webgal_derive::{ActionCustom, Actionable};
 
-use crate::impl_serde_display;
+use crate::impl_display_for_serde;
 use crate::models::bestdori::LayoutSideType;
 
 /// WebGAL 命令
@@ -53,7 +53,7 @@ impl Transform {
     }
 }
 
-impl_serde_display! {Transform}
+impl_display_for_serde! {Transform}
 
 // ---------------- model ----------------
 

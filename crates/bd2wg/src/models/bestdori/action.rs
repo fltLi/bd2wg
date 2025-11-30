@@ -17,15 +17,6 @@ pub enum Action {
     Unknown,
 }
 
-/// Live2D 动作
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Motion {
-    pub delay: f32,
-    pub character: u8, // *Bushiroad 的生产力没有超过 u8
-    pub motion: String,
-    pub expression: String,
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TalkAction {
     pub wait: bool,
