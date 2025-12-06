@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::*;
 
+use super::*;
+
 /// Live2D 动作
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Motion {
@@ -19,14 +21,26 @@ pub struct Motion {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Live2dPath {
     #[serde(rename = "fileName")]
-    file: String,
+    pub file: String,
     #[serde(rename = "bundleName")]
-    bundle: String,
+    pub bundle: String,
 }
 
-/// Live2D 配置文件
+impl Live2dPath {
+    /// 连接 bundle 与 file
+    pub fn path(&self) -> String {
+        format!("{}_rip/{}", self.bundle, self.file)
+    }
+
+    /// Bestdori 资源链接
+    pub fn url(&self) -> String {
+        format!("{BESTDORI_ASSETS_URL_ROOT}{}", self.path())
+    }
+}
+
+/// Bestdori Live2D 配置文件
 ///
-/// 请使用 Self::from_str 方法经由中间结构体反序列化.
+/// 请使用 Self::from_slice 方法经由中间结构体反序列化.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Model {
     pub model: Live2dPath,
@@ -36,12 +50,10 @@ pub struct Model {
     pub expessions: Vec<Live2dPath>,
 }
 
-impl FromStr for Model {
-    type Err = Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let helper: ModelHelper = serde_json::from_str(s)?;
-        Ok(helper.model)
+impl Model {
+    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
+        let helper: ModelHelper = serde_json::from_slice(bytes)?;
+        Ok(helper.into())
     }
 }
 
@@ -49,4 +61,10 @@ impl FromStr for Model {
 struct ModelHelper {
     #[serde(rename = "Base")]
     model: Model,
+}
+
+impl From<ModelHelper> for Model {
+    fn from(value: ModelHelper) -> Self {
+        value.model
+    }
 }

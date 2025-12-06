@@ -10,14 +10,12 @@ use super::*;
 
 /// Bestdori 故事脚本
 ///
-/// 请使用 Self::from_str 方法经由中间结构体反序列化.
+/// 请使用 Self::from_slice 方法经由中间结构体反序列化.
 pub struct Story(Vec<Action>);
 
-impl FromStr for Story {
-    type Err = Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let helper: StoryHelper = serde_json::from_str(s)?;
+impl Story {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let helper: StoryHelper = serde_json::from_slice(bytes)?;
         Ok(helper.into())
     }
 }

@@ -28,10 +28,24 @@ pub struct DownloadError {
     pub error: DownloadErrorKind,
 }
 
+impl From<DownloadErrorKind> for DownloadError {
+    /// 创建不包含 url 和 path 的下载错误
+    fn from(value: DownloadErrorKind) -> Self {
+        Self {
+            url: String::default(),
+            path: PathBuf::default(),
+            error: value,
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum DownloadErrorKind {
     #[error("reqwest failed: {0}")]
     Reqwest(#[from] reqwest::Error),
+
+    #[error("serde_json failed: {0}")]
+    SerdeJson(#[from] serde_json::Error),  // live2d 配置解析
 
     #[error("io failed: {0}")]
     Io(#[from] io::Error),

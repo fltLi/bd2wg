@@ -52,7 +52,7 @@ impl Handle for DownloadHandle {
 
     /// 等待并获取下载结果
     ///
-    /// 若此操作前下载池 / 下载任务已调用 cancel, 将发生 panic.
+    /// panic: 下载池 / 句柄被调用 cancel.
     fn join(self) -> Self::Result {
         self.receiver.recv().unwrap() // 下载池不应崩溃
     }
@@ -126,20 +126,22 @@ struct DownloadPoolWorker {
 
 impl DownloadPoolWorker {
     /// 创建 (但不运行) 下载池内部管理
-    fn new(
-        headers: HeaderMap,
-        cancel: Arc<AtomicBool>,
-        receiver: Receiver<DownloadCommand>,
-    ) -> Result<Self> {
+    fn new(headers: HeaderMap) -> Result<(Self, Arc<AtomicBool>, Sender<DownloadCommand>)> {
         let client = new_client_with_headers(headers.clone())?;
-        Ok(Self {
-            count: 0,
-            headers,
-            client,
+        let cancel = Arc::new(AtomicBool::new(false));
+        let (sender, receiver) = channel();
+        Ok((
+            Self {
+                count: 0,
+                headers,
+                client,
+                cancel: cancel.clone(),
+                receiver,
+                tasks: VecDeque::new(),
+            },
             cancel,
-            receiver,
-            tasks: VecDeque::new(),
-        })
+            sender,
+        ))
     }
 
     /// 退出全部下载任务
@@ -240,7 +242,7 @@ impl DownloadPoolWorker {
 
     // ----------------- task: end -----------------
 
-    /// (在当前线程) 消耗下载器并执行主循环
+    /// (阻塞) 执行主循环
     ///
     /// 保证下载循环不会崩溃, 进而保证下载任务和下载池句柄的有效性.
     ///
@@ -286,10 +288,7 @@ pub struct DownloadPool {
 impl DownloadPool {
     /// 根据请求头启动下载池
     pub fn new(headers: HeaderMap) -> Result<Self> {
-        let cancel = Arc::new(AtomicBool::new(false));
-        let (sender, receiver) = channel();
-
-        let worker = DownloadPoolWorker::new(headers, cancel.clone(), receiver)?;
+        let (worker, cancel, sender) = DownloadPoolWorker::new(headers)?;
         let handle = thread::spawn(move || worker.run());
 
         Ok(Self {
@@ -303,7 +302,7 @@ impl DownloadPool {
     ///
     /// 非阻塞地在子线程启动下载任务, 返回任务句柄.
     ///
-    /// 若此操作前已调用 cancel, 将发生 panic.
+    /// panic: 下载池被调用 cancel.
     pub fn download(&mut self, url: &str) -> DownloadHandle {
         let (command, handle) = new_download_task(url);
         self.sender.send(command).unwrap();
@@ -316,7 +315,7 @@ impl Handle for DownloadPool {
 
     /// 等待下载任务完成
     ///
-    /// 若此操作前已调用 cancel, 将发生 panic.
+    /// panic: 下载池被调用 cancel.
     fn join(mut self) -> Self::Result {
         self.handle.take().unwrap().join().unwrap(); // 下载池不应崩溃
     }
@@ -329,8 +328,6 @@ impl Handle for DownloadPool {
     }
 
     /// 询问下载任务是否均已完成
-    ///
-    /// 无论是否调用过 cancel, 此操作均不会 panic.
     fn is_finished(&self) -> bool {
         self.handle
             .as_ref()

@@ -2,6 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Bestdori 资源入口链接
+pub const BESTDORI_ASSETS_URL_ROOT: &str = "https://bestdori.com/assets/jp/";
+
 /// Bestdori 资源类型
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

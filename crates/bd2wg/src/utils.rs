@@ -1,5 +1,9 @@
 //! 辅助工具
 
+use std::fs;
+use std::path::Path;
+
+use bytes::Bytes;
 use reqwest::blocking::Client;
 use reqwest::header::HeaderMap;
 
@@ -34,4 +38,13 @@ macro_rules! impl_display_for_serde {
 /// 从请求头快速创建 Client
 pub fn new_client_with_headers(headers: HeaderMap) -> reqwest::Result<Client> {
     Client::builder().default_headers(headers).build()
+}
+
+/// 创建完整路径, 将字节写入文件
+pub fn create_and_write<B: AsRef<[u8]>>(bytes: &B, path: &Path) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    fs::write(path, bytes)?;
+    Ok(())
 }

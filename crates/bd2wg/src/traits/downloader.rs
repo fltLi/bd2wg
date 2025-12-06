@@ -14,5 +14,5 @@ use crate::traits::handle::Handle;
 /// 建议下载器内部管理基础下载任务池, 接受每个任务句柄的调用.
 pub trait Downloader: Handle<Result = ()> {
     /// 启动下载任务
-    fn download<R: AsRef<Resource>>(&mut self, resource: R) -> Result<Box<dyn Handle<Result = Result<()>>>>;
+    fn download<R: AsRef<Resource>>(&mut self, resource: R) -> Box<dyn Handle<Result = Result<()>>>;
 }
