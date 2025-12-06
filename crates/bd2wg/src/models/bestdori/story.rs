@@ -38,20 +38,20 @@ impl From<StoryHelper> for Story {
         let mut story = Vec::with_capacity(actions.len() + 2);
 
         // 推入初始 bgm, background
-        if let Some(bgm) = bgm {
+        if let Some(res) = bgm {
             story.push(Action::Sound(SoundAction {
                 wait: false,
                 delay: 0.,
-                bgm: Some(bgm),
+                bgm: Some(res),
                 se: None,
             }));
         }
 
-        if let Some(background) = background {
+        if let Some(res) = background {
             story.push(Action::Effect(EffectAction {
                 wait: false,
                 delay: 0.,
-                effect: Effect::ChangeBackground { image: background },
+                effect: Effect::ChangeBackground { image: res },
             }));
         }
 

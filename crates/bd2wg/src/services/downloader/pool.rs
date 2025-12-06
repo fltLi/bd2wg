@@ -72,6 +72,7 @@ impl_drop_for_handle! {DownloadHandle}
 fn new_download_task(url: &str) -> (DownloadCommand, DownloadHandle) {
     let cancel = Arc::new(AtomicBool::new(false));
     let (sender, receiver) = channel();
+
     (
         DownloadCommand {
             url: url.to_string(),
@@ -97,6 +98,7 @@ impl DownloadTask {
             cancel,
             sender,
         } = command;
+
         Self {
             count: 0,
             url,
@@ -105,10 +107,16 @@ impl DownloadTask {
         }
     }
 
-    /// 结束任务, 提供返回值
-    fn send(&mut self, result: Result<Bytes>) {
+    /// 提供返回值
+    fn send(&mut self, res: Result<Bytes>) {
+        let _ = self.sender.send(res);
+    }
+}
+
+impl Drop for DownloadTask {
+    /// 更新结束标志
+    fn drop(&mut self) {
         self.cancel.store(true, Ordering::Relaxed);
-        let _ = self.sender.send(result);
     }
 }
 
@@ -128,8 +136,10 @@ impl DownloadPoolWorker {
     /// 创建 (但不运行) 下载池内部管理
     fn new(headers: HeaderMap) -> Result<(Self, Arc<AtomicBool>, Sender<DownloadCommand>)> {
         let client = new_client_with_headers(headers.clone())?;
+
         let cancel = Arc::new(AtomicBool::new(false));
         let (sender, receiver) = channel();
+
         Ok((
             Self {
                 count: 0,
@@ -153,19 +163,19 @@ impl DownloadPoolWorker {
     fn receive(&mut self) {
         if !self.tasks.is_empty() {
             // 有任务时, 非阻塞加入当前全部任务
-            self.receiver.try_iter().for_each(|command| {
-                self.tasks.push_back(DownloadTask::new(command));
+            self.receiver.try_iter().for_each(|cmd| {
+                self.tasks.push_back(DownloadTask::new(cmd));
             });
-        } else if let Ok(command) = self.receiver.recv() {
+        } else if let Ok(cmd) = self.receiver.recv() {
             // 没有任务时, 阻塞等待下一个任务
             // 当 Sender 丢弃时, 忽略错误, run() 将进入下一轮开头的退出检查分支
-            self.tasks.push_back(DownloadTask::new(command));
+            self.tasks.push_back(DownloadTask::new(cmd));
         }
     }
 
     // ---------------- task: begin ----------------
 
-    /// 处理单个下载任务（从队列中弹出后调用）
+    /// 处理单个下载任务 (从队列中弹出后调用)
     fn handle_task(&mut self, task: DownloadTask) {
         // 检查取消
         if task.cancel.load(Ordering::Relaxed) {
@@ -185,8 +195,8 @@ impl DownloadPoolWorker {
         if self.count >= CLIENT_RESTART_FAILURE_THRESHOLD {
             // 等待一段时间再尝试重建 client
             thread::sleep(CLIENT_RESTART_BACKOFF);
-            if let Ok(new_client) = new_client_with_headers(self.headers.clone()) {
-                self.client = new_client;
+            if let Ok(client) = new_client_with_headers(self.headers.clone()) {
+                self.client = client;
             }
             // 清空连续失败计数
             self.count = 0;
@@ -304,8 +314,8 @@ impl DownloadPool {
     ///
     /// panic: 下载池被调用 cancel.
     pub fn download(&mut self, url: &str) -> DownloadHandle {
-        let (command, handle) = new_download_task(url);
-        self.sender.send(command).unwrap();
+        let (cmd, handle) = new_download_task(url);
+        self.sender.send(cmd).unwrap();
         handle
     }
 }

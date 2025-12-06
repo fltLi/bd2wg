@@ -44,11 +44,11 @@ impl Handle for CommonDownloadHandle {
             .unwrap()
             .join()
             .and_then(|bytes| create_and_write(&bytes, &self.path).map_err(DownloadErrorKind::Io))
-            .map_err(|error| {
+            .map_err(|e| {
                 Error::Download(DownloadError {
                     url: self.url.clone(),
                     path: self.path.clone(),
-                    error,
+                    error: e,
                 })
             })
     }
@@ -87,6 +87,9 @@ impl Live2dDownloadWorker {
     ) -> (Self, Arc<AtomicBool>, Receiver<Result<()>>) {
         let cancel = Arc::new(AtomicBool::new(false));
         let (sender, receiver) = channel();
+
+        count.fetch_add(1, Ordering::Relaxed);
+
         (
             Self {
                 url: url.to_string(),
@@ -102,8 +105,8 @@ impl Live2dDownloadWorker {
     }
 
     /// 结束任务, 提供返回值
-    fn send(self, result: Result<()>) {
-        let _ = self.sender.send(result);
+    fn send(self, res: Result<()>) {
+        let _ = self.sender.send(res);
     }
 
     /// (阻塞) 执行主循环
@@ -139,15 +142,15 @@ impl Live2dDownloadWorker {
             .and_then(|model| bestdori::Model::from_slice(&model))
             .and_then(|model| {
                 // 解析为 WebGAL Live2D 配置文件
-                let (model, resource) = webgal::Model::from_bestdori_model(model);
+                let (model, res) = webgal::Model::from_bestdori_model(model);
 
                 // 写入配置文件
                 create_and_write(
                     &serde_json::to_vec_pretty(&model).map_err(Error::SerdeJson)?,
                     Path::new(&default_model_config_path(&self.path.to_string_lossy())),
                 )
-                .map_err(|err| download_error(err.into()))
-                .map(|_| resource)
+                .map_err(|e| download_error(e.into()))
+                .map(|_| res)
             })
         };
 
@@ -166,6 +169,8 @@ impl Live2dDownloadWorker {
                 })
             };
         }
+
+        self.send(Ok(()));
     }
 }
 
@@ -243,18 +248,18 @@ impl Downloader {
     }
 
     /// 下载普通资源
-    fn download_normal(&mut self, resource: &Resource) -> CommonDownloadHandle {
-        let path = resource.absolute_path(&self.root);
+    fn download_normal(&mut self, res: &Resource) -> CommonDownloadHandle {
+        let path = res.absolute_path(&self.root);
         let handle = self
             .pool
             .as_ref()
             .unwrap()
             .lock()
             .unwrap()
-            .download(&resource.url);
+            .download(&res.url);
 
         CommonDownloadHandle {
-            url: resource.url.clone(),
+            url: res.url.clone(),
             path,
             handle: Some(handle),
         }
@@ -263,10 +268,10 @@ impl Downloader {
     /// 下载 Live2D 模型
     ///
     /// resource.url 实际为 buildScript url.
-    fn download_model(&mut self, resource: &Resource) -> Live2dDownloadHandle {
+    fn download_model(&mut self, res: &Resource) -> Live2dDownloadHandle {
         Live2dDownloadHandle::new(
-            &resource.url,
-            &resource.absolute_path(&self.root), // 编译器会优化掉 & + clone 吧...
+            &res.url,
+            &res.absolute_path(&self.root), // 编译器会优化掉 & + clone 吧...
             self.count.clone(),
             self.pool.as_ref().unwrap().clone(),
         )
@@ -308,14 +313,11 @@ impl Handle for Downloader {
 }
 
 impl DownloaderTrait for Downloader {
-    fn download<R: AsRef<Resource>>(
-        &mut self,
-        resource: R,
-    ) -> Box<dyn Handle<Result = Result<()>>> {
-        let resource = resource.as_ref();
-        match resource.kind {
-            ResourceType::Figure => Box::new(self.download_model(resource)),
-            _ => Box::new(self.download_normal(resource)),
+    fn download<R: AsRef<Resource>>(&mut self, res: R) -> Box<dyn Handle<Result = Result<()>>> {
+        let res = res.as_ref();
+        match res.kind {
+            ResourceType::Figure => Box::new(self.download_model(res)),
+            _ => Box::new(self.download_normal(res)),
         }
     }
 }

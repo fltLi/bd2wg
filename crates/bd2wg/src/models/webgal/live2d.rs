@@ -46,13 +46,13 @@ pub struct Model {
 impl Model {
     /// 解析 Bestdori Live2D BuildScript, 获取配置和资源 (url / relative path)
     pub fn from_bestdori_model(model: bestdori::Model) -> (Self, Vec<(String, PathBuf)>) {
-        let mut resource = Vec::with_capacity(
+        let mut res = Vec::with_capacity(
             1 + model.textures.len() + model.motions.len() + model.expessions.len(),
         );
 
         // 模型和物理采用默认路径
-        resource.push((model.model.url(), WEBGAL_LIVE2D_MODEL.into()));
-        resource.push((model.physics.url(), WEBGAL_LIVE2D_PHYSICS.into()));
+        res.push((model.model.url(), WEBGAL_LIVE2D_MODEL.into()));
+        res.push((model.physics.url(), WEBGAL_LIVE2D_PHYSICS.into()));
 
         // 解析纹理, 动作和表情
         let model = ModelBuilder::default()
@@ -63,7 +63,7 @@ impl Model {
                     .map(|url| {
                         let path = format!("{WEBGAL_LIVE2D_TEXTURES}{}", url.path());
 
-                        resource.push((url.url(), PathBuf::from(&path)));
+                        res.push((url.url(), PathBuf::from(&path)));
                         path
                     })
                     .collect(),
@@ -76,7 +76,7 @@ impl Model {
                         let file = url.file.strip_suffix(".mtn.bytes").unwrap_or(&url.file);
                         let path = format!("{WEBGAL_LIVE2D_MOTIONS}{file}.mtn");
 
-                        resource.push((url.url(), PathBuf::from(&path)));
+                        res.push((url.url(), PathBuf::from(&path)));
                         (file.to_string(), vec![file.to_string().into()])
                     })
                     .collect(),
@@ -89,7 +89,7 @@ impl Model {
                         let file = url.file.strip_suffix(".exp.json").unwrap_or(&url.file);
                         let path = format!("{WEBGAL_LIVE2D_EXPRESSIONS}{}", url.file);
 
-                        resource.push((url.url(), PathBuf::from(&path)));
+                        res.push((url.url(), PathBuf::from(&path)));
                         Expression {
                             name: file.to_string(),
                             file: path.to_string(),
@@ -100,7 +100,7 @@ impl Model {
             .build()
             .unwrap();
 
-        (model, resource)
+        (model, res)
     }
 }
 
