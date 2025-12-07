@@ -3,10 +3,16 @@
 use serde::{Deserialize, Serialize};
 
 /// Bestdori 资源入口链接
-pub const BESTDORI_ASSETS_URL_ROOT: &str = "https://bestdori.com/assets/jp/";
+pub const BESTDORI_ASSET_URL_ROOT: &str = "https://bestdori.com/assets/jp/";
 
-/// Bestdori 资源类型
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub const BESTDORI_ASSET_URL_BGM: &str = "https://bestdori.com/assets/jp/sound/scenario/bgm/";
+pub const BESTDORI_ASSET_URL_SE: &str = "https://bestdori.com/res/CommonSE/";
+
+pub const BESTDORI_ASSET_URL_MODEL: &str = "https://bestdori.com/assets/jp/live2d/chara/";
+pub const BESTDORI_ASSET_URL_MODEL_BUILDER: &str = "buildData.asset";
+
+/// Bestdori 资源所属类型
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ResourceType {
     #[default]

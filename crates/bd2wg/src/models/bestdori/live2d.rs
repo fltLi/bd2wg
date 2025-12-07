@@ -34,7 +34,7 @@ impl Live2dPath {
 
     /// Bestdori 资源链接
     pub fn url(&self) -> String {
-        format!("{BESTDORI_ASSETS_URL_ROOT}{}", self.path())
+        format!("{BESTDORI_ASSET_URL_ROOT}{}", self.path())
     }
 }
 

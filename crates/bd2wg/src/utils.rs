@@ -21,14 +21,30 @@ macro_rules! impl_drop_for_handle {
     };
 }
 
-/// 为支持 Serialize 的对象实现 Display
+/// 为 Serialize 实现 Display
 #[macro_export]
 macro_rules! impl_display_for_serde {
-    ($name:ident) => {
+    ($t:ty) => {
         paste::paste! {
-            impl Display for $name {
+            impl Display for $t {
                 fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                     write!(f, "{}", serde_json::to_string(self).map_err(|_| fmt::Error)?)
+                }
+            }
+        }
+    };
+}
+
+/// 为 AsRef 实现 Deref
+#[macro_export]
+macro_rules! impl_deref_for_asref {
+    ($t:ty, $to:ty) => {
+        paste::paste! {
+            impl Deref for $t {
+                type Target = $to;
+
+                fn deref(&self) -> &Self::Target {
+                    self.as_ref()
                 }
             }
         }
@@ -47,4 +63,29 @@ pub fn create_and_write<B: AsRef<[u8]>>(bytes: &B, path: &Path) -> std::io::Resu
     }
     fs::write(path, bytes)?;
     Ok(())
+}
+
+/// 从 url 生成唯一路径
+pub fn gen_name_from_url(url: &str, extend: &str) -> String {
+    url.chars()
+        .map(|c| match c {
+            ':' | '?' | '*' | '"' | '<' | '>' | '|' | '\\' | '/' | ' ' => '_',
+            c => c,
+        })
+        .chain(extend.chars())
+        .collect()
+}
+
+/// 将第一个英文字母变为小写
+pub fn lower_first_alphabetic(s: &str) -> String {
+    let mut find = false;
+    s.chars()
+        .map(|mut c| {
+            if !find && c.is_ascii_alphabetic() {
+                find = true;
+                c.make_ascii_lowercase();
+            }
+            c
+        })
+        .collect()
 }

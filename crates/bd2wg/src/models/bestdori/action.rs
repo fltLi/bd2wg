@@ -66,7 +66,7 @@ pub struct EffectAction {
     pub effect: Effect,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LayoutType {
     Appear,
@@ -74,7 +74,7 @@ pub enum LayoutType {
     Move,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LayoutSideType {
     LeftInside,

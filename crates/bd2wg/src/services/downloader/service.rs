@@ -11,14 +11,15 @@ use std::{fs, thread};
 
 use reqwest::header::HeaderMap;
 
+use crate::error::*;
+use crate::impl_drop_for_handle;
 use crate::models::bestdori;
 use crate::models::webgal::{self, Resource, ResourceType, default_model_config_path};
 use crate::services::downloader::pool;
 use crate::traits::asset::Asset;
-use crate::traits::handle;
-use crate::traits::{downloader::Downloader as DownloaderTrait, handle::Handle};
+use crate::traits::downloader::Downloader as DownloaderTrait;
+use crate::traits::handle::Handle;
 use crate::utils::create_and_write;
-use crate::{error::*, impl_drop_for_handle};
 
 use super::pool::{DownloadHandle, DownloadPool};
 
@@ -313,7 +314,7 @@ impl Handle for Downloader {
 }
 
 impl DownloaderTrait for Downloader {
-    fn download<R: AsRef<Resource>>(&mut self, res: R) -> Box<dyn Handle<Result = Result<()>>> {
+    fn download(&mut self, res: impl AsRef<Resource>) -> Box<dyn Handle<Result = Result<()>>> {
         let res = res.as_ref();
         match res.kind {
             ResourceType::Figure => Box::new(self.download_model(res)),

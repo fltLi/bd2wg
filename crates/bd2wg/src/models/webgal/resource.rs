@@ -7,7 +7,7 @@ use strum_macros::{AsRefStr, Display, EnumString};
 use crate::traits::asset::Asset;
 
 /// WebGAL 资源类型
-#[derive(Debug, Clone, PartialEq, Eq, Hash, AsRefStr, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, AsRefStr, Display)]
 #[strum(serialize_all = "camelCase")]
 pub enum ResourceType {
     Background,
@@ -35,12 +35,12 @@ impl Resource {
 impl Asset for Resource {
     fn relative_path(&self) -> String {
         match self.kind {
-            ResourceType::Figure => format!("{}/model.json", self.default_relative_path()),
+            ResourceType::Figure => super::default_model_config_path(&self.default_relative_path()),
             _ => self.default_relative_path(),
         }
     }
 
-    fn absolute_path<P: AsRef<Path>>(&self, root: P) -> PathBuf {
+    fn absolute_path(&self, root: impl AsRef<Path>) -> PathBuf {
         root.as_ref().join(self.default_relative_path())
     }
 }

@@ -17,7 +17,7 @@ impl Display for Action {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum FigureSide {
     Left,
     #[default]
