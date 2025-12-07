@@ -2,3 +2,4 @@
 
 pub mod downloader;
 pub mod resolver;
+pub mod transpiler;

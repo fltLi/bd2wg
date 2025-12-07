@@ -9,7 +9,7 @@ use crate::impl_display_for_serde;
 use crate::models::bestdori::LayoutSideType;
 
 /// WebGAL 命令
-pub struct Action(pub Box<dyn Actionable + Send + Sync>);
+pub struct Action(pub Box<dyn Actionable + Send + Sync + 'static>);
 
 impl Display for Action {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

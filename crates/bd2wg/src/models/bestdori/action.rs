@@ -17,6 +17,19 @@ pub enum Action {
     Unknown,
 }
 
+impl Action {
+    pub fn is_wait(&self) -> bool {
+        match self {
+            Self::Talk(a) => a.wait,
+            Self::Sound(a) => a.wait,
+            Self::Effect(a) => a.wait,
+            Self::Layout(a) => a.wait,
+            Self::Motion(a) => a.wait,
+            Self::Unknown => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TalkAction {
     pub wait: bool,

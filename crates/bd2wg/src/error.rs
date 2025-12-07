@@ -22,6 +22,9 @@ pub enum Error {
 
     #[error("resolve: {0}")]
     Resolve(#[from] ResolveError),
+
+    #[error("transpile: {0}")]
+    Transpile(#[from] TranspileError),
 }
 
 /// 下载错误
@@ -59,4 +62,21 @@ pub enum DownloadErrorKind {
 pub struct ResolveError {
     pub kind: ResourceType,
     pub resource: bestdori::Resource,
+}
+
+/// 转译错误
+#[derive(Debug, Error)]
+#[error("error: {}, action: {:?}", self.error, self.action)]
+pub struct TranspileError {
+    pub action: Box<bestdori::Action>,
+    pub error: TranspileErrorKind,
+}
+
+#[derive(Debug, Error)]
+pub enum TranspileErrorKind {
+    #[error("unknown")]
+    Unknown,
+
+    #[error("uninit figure: {0}")]
+    UninitFigure(u8),
 }

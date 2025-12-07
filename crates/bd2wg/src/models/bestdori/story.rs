@@ -11,12 +11,23 @@ use super::*;
 /// Bestdori 故事脚本
 ///
 /// 请使用 Self::from_slice 方法经由中间结构体反序列化.
-pub struct Story(Vec<Action>);
+pub struct Story(pub Vec<Action>);
 
 impl Story {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let helper: StoryHelper = serde_json::from_slice(bytes)?;
         Ok(helper.into())
+    }
+
+    /// 迭代, 每次提供下一项的 wait
+    pub fn iter_with_wait(&self) -> impl Iterator<Item = (&Action, bool)> {
+        self.0.iter().zip(
+            self.0
+                .iter()
+                .map(|a| a.is_wait())
+                .skip(1)
+                .chain(std::iter::once(false)),
+        )
     }
 }
 

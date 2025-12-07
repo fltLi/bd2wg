@@ -6,7 +6,7 @@ use crate::error::*;
 use crate::impl_deref_for_asref;
 use crate::models::{bestdori, webgal};
 
-/// 资源解析类型
+/// 常规资源解析类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResourceType {
     Image,
