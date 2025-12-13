@@ -20,7 +20,7 @@ use crate::traits::handle::Handle;
 use crate::utils::new_client_with_headers;
 
 /// 下载池返回类型
-pub type Result<T> = std::result::Result<T, DownloadErrorKind>;
+pub type PoolResult<T> = std::result::Result<T, DownloadErrorKind>;
 
 /// 单个下载任务时间限制
 const DOWNLOAD_TASK_TIMEOUT: Duration = Duration::from_secs(16);
@@ -38,17 +38,17 @@ const CLIENT_RESTART_BACKOFF: Duration = Duration::from_secs(8);
 struct DownloadCommand {
     url: String,
     cancel: Arc<AtomicBool>,
-    sender: Sender<Result<Bytes>>,
+    sender: Sender<PoolResult<Bytes>>,
 }
 
 /// 下载任务句柄
 pub struct DownloadHandle {
     cancel: Arc<AtomicBool>,
-    receiver: Receiver<Result<Bytes>>,
+    receiver: Receiver<PoolResult<Bytes>>,
 }
 
 impl Handle for DownloadHandle {
-    type Result = Result<Bytes>;
+    type Result = PoolResult<Bytes>;
 
     /// 等待并获取下载结果
     ///
@@ -88,7 +88,7 @@ struct DownloadTask {
     count: usize,
     url: String,
     cancel: Arc<AtomicBool>,
-    sender: Sender<Result<Bytes>>,
+    sender: Sender<PoolResult<Bytes>>,
 }
 
 impl DownloadTask {
@@ -108,7 +108,7 @@ impl DownloadTask {
     }
 
     /// 提供返回值
-    fn send(&mut self, res: Result<Bytes>) {
+    fn send(&mut self, res: PoolResult<Bytes>) {
         let _ = self.sender.send(res);
     }
 }
@@ -134,7 +134,7 @@ struct DownloadPoolWorker {
 
 impl DownloadPoolWorker {
     /// 创建 (但不运行) 下载池内部管理
-    fn new(headers: HeaderMap) -> Result<(Self, Arc<AtomicBool>, Sender<DownloadCommand>)> {
+    fn new(headers: HeaderMap) -> PoolResult<(Self, Arc<AtomicBool>, Sender<DownloadCommand>)> {
         let client = new_client_with_headers(headers.clone())?;
 
         let cancel = Arc::new(AtomicBool::new(false));
@@ -297,7 +297,7 @@ pub struct DownloadPool {
 
 impl DownloadPool {
     /// 根据请求头启动下载池
-    pub fn new(headers: HeaderMap) -> Result<Self> {
+    pub fn new(headers: HeaderMap) -> PoolResult<Self> {
         let (worker, cancel, sender) = DownloadPoolWorker::new(headers)?;
         let handle = thread::spawn(move || worker.run());
 

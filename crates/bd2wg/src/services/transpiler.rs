@@ -4,19 +4,23 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use derive_builder::Builder;
+
 use crate::error::*;
 use crate::models::webgal::{ChangeFigureAction, SayAction};
 use crate::models::{
     bestdori::{self, Motion},
     webgal::{self, FigureSide, Resource, Scene, Transform},
 };
-use crate::traits::resolver::Resolver;
-use crate::traits::transpiler::{TranspileResult, Transpiler as TranspilerTrait};
+use crate::return_ok;
+use crate::traits::asset::Asset;
+use crate::traits::resolve::*;
+use crate::traits::transpile::*;
 
 type PreResult<T> = std::result::Result<T, TranspileErrorKind>;
 
 /// 模型上下文信息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Builder)]
 struct Model {
     path: String,
     side: FigureSide,
@@ -35,14 +39,14 @@ struct Context {
 /// 脚本转译器
 ///
 /// 若希望复用 Resolver, 考虑使用 Arc 包装一个实现.
-pub struct Transpiler<R: Resolver> {
+pub struct Transpiler<R: Resolve> {
     resolver: R,
     context: Context,
     scenes: Vec<Scene>,
     resources: Vec<Arc<Resource>>,
 }
 
-impl<R: Resolver> Transpiler<R> {
+impl<R: Resolve> Transpiler<R> {
     pub fn new(resolver: R) -> Self {
         Self {
             resolver,
@@ -61,19 +65,63 @@ impl<R: Resolver> Transpiler<R> {
     }
 
     /// 清空场景
-    fn clear(&mut self) {
-        unimplemented!()
+    fn clear(&mut self) -> Context {
+        // 移除人物
+        let actions: Vec<webgal::Action> = self
+            .context
+            .models
+            .keys()
+            .map(|&id| webgal::ChangeFigureAction::new_hide(id, true).into())
+            // 移除背景
+            .chain(std::iter::once(webgal::ChangeBgAction::default().into()))
+            .collect();
+
+        for act in actions {
+            self.push_action(act);
+        }
+
+        std::mem::take(&mut self.context)
     }
 
-    /// 清理并切换场景
-    fn next_scene(&mut self) {
+    /// 设置上下文
+    fn set_context(&mut self, context: Context) {
+        // 清空场景 (场景大概为空)
         self.clear();
-        self.scenes
-            .push(Scene::new(&format!("scene-{}.txt", self.scenes.len())));
+
+        // 设置人物
+        for (&id, model) in &context.models {
+            self.display_model(id, model.clone(), true);
+        }
+
+        // 设置背景
+        self.push_action(
+            webgal::ChangeBgAction {
+                image: context.background.clone(),
+                next: false,
+            }
+            .into(),
+        );
+
+        // 设置场景
+        self.context = context;
+    }
+
+    /// 下一个场景的名称
+    fn next_scene_name(&self) -> String {
+        format!("scene-{}.txt", self.scenes.len())
     }
 
     fn push_action(&mut self, action: webgal::Action) {
         self.scenes.last_mut().unwrap().actions.push(action);
+    }
+
+    /// 识别并记录新资源
+    ///
+    /// 始终在上下文使用完资源后调用以记录
+    fn try_push_resource(&mut self, res: ResourceEntry) {
+        if let ResourceEntry::Vacant(v) = res {
+            self.resources.push(v);
+        }
     }
 
     // ---------------- transpile ----------------
@@ -84,10 +132,10 @@ impl<R: Resolver> Transpiler<R> {
 
         match action {
             Action::Talk(a) => self.transpile_talk(a, wait),
-            Action::Sound(a) => self.transpile_sound(a, wait),
+            Action::Sound(a) => self.transpile_sound(a),
             Action::Effect(a) => self.transpile_effect(a, wait),
             Action::Layout(a) => self.transpile_layout(a, wait),
-            Action::Motion(a) => self.transpile_motion(a, wait),
+            Action::Motion(a) => return_ok! {self.transpile_motion(a, wait)},
             Action::Unknown => Err(TranspileErrorKind::Unknown),
         }
         .map_err(|e| {
@@ -112,9 +160,7 @@ impl<R: Resolver> Transpiler<R> {
 
         // 执行动作
         for motion in motions {
-            if let Err(e) = self.display_motion(motion, true) {
-                res = Err(e);
-            }
+            res = res.and(self.try_display_motion(motion, true));
         }
 
         // 执行对话
@@ -131,23 +177,196 @@ impl<R: Resolver> Transpiler<R> {
         res
     }
 
-    fn transpile_sound(&mut self, action: &bestdori::SoundAction, wait: bool) -> PreResult<()> {
-        unimplemented!()
+    fn transpile_sound(&mut self, action: &bestdori::SoundAction) -> PreResult<()> {
+        let bestdori::SoundAction { bgm, se, .. } = action;
+
+        Ok(())
+            // 执行 bgm
+            .and(bgm.as_ref().map_or(Ok(()), |bgm| self.transpile_bgm(bgm)))
+            // 执行 se
+            .and(se.as_ref().map_or(Ok(()), |se| self.transpile_se(se)))
     }
 
     fn transpile_effect(&mut self, action: &bestdori::EffectAction, wait: bool) -> PreResult<()> {
-        unimplemented!()
+        use bestdori::Effect;
+
+        match &action.effect {
+            // 入场
+            Effect::BlackIn | Effect::WhiteIn => self.display_transition("enter", !wait),
+
+            // 退场
+            Effect::BlackOut | Effect::WhiteOut => self.display_transition("exit", !wait),
+
+            // 呈现字幕
+            Effect::Telop { text } => self.display_telop(text),
+
+            // 修改背景
+            Effect::ChangeBackground { image } => self.display_background(image, !wait)?,
+
+            // 呈现卡面
+            Effect::ChangeCardStill { image } => self.display_cardstill(image, !wait)?,
+        }
+
+        Ok(())
     }
 
     fn transpile_layout(&mut self, action: &bestdori::LayoutAction, wait: bool) -> PreResult<()> {
-        unimplemented!()
+        let bestdori::LayoutAction {
+            kind,
+            model,
+            motion,
+            side: bestdori::LayoutSide { to, to_x, .. },
+            ..
+        } = action;
+
+        match kind {
+            // 执行退场
+            bestdori::LayoutType::Hide => self.remove_model(motion.character, !wait),
+
+            // 执行移动
+            bestdori::LayoutType::Move => return_ok! {{
+                let model = self
+                    .context
+                    .models
+                    .get_mut(&motion.character)
+                    .ok_or(TranspileErrorKind::UninitFigure(motion.character))?;
+
+                model.side = (*to).into();
+                model.transform = Transform::new_with_x(*to_x);
+
+                self.try_display_motion(motion, !wait).unwrap();
+            }},
+
+            // 执行登场
+            bestdori::LayoutType::Appear => return_ok! {{
+                let res = self.resolver.resolve_model(model);
+
+                self.display_motion(model, motion, !wait);
+
+                self.try_push_resource(res);
+            }},
+        }
     }
 
-    fn transpile_motion(&mut self, action: &bestdori::MotionAction, wait: bool) -> PreResult<()> {
-        unimplemented!()
+    fn transpile_motion(&mut self, action: &bestdori::MotionAction, wait: bool) {
+        let bestdori::MotionAction { model, motion, .. } = action;
+
+        let res = self.resolver.resolve_model(model);
+
+        // 执行模型动作
+        self.display_motion(&res.relative_path(), motion, !wait);
+
+        self.try_push_resource(res);
     }
 
     // ---------------- transpile ----------------
+
+    /// 转译 sound/bgm
+    fn transpile_bgm(&mut self, res: &bestdori::Resource) -> PreResult<()> {
+        let res = self.resolver.resolve_normal(res, ResourceType::Bgm)?;
+
+        self.push_action(
+            webgal::BgmAction {
+                sound: Some(res.relative_path()),
+            }
+            .into(),
+        );
+
+        self.try_push_resource(res);
+
+        Ok(())
+    }
+
+    /// 转译 sound/se
+    fn transpile_se(&mut self, res: &bestdori::Resource) -> PreResult<()> {
+        let res = self.resolver.resolve_normal(res, ResourceType::Bgm)?;
+
+        self.push_action(
+            webgal::PlayEffectAction {
+                sound: Some(res.relative_path()),
+            }
+            .into(),
+        );
+
+        self.try_push_resource(res);
+
+        Ok(())
+    }
+
+    /// 执行转场
+    ///
+    /// 是否需要清空背景?
+    fn display_transition(&mut self, animation: &str, next: bool) {
+        self.push_action(
+            webgal::SetAnimation {
+                animation: animation.to_string(),
+                target: "bg-main".to_string(),
+                next,
+            }
+            .into(),
+        );
+    }
+
+    /// 呈现字幕 (通过切换场景实现)
+    fn display_telop(&mut self, text: &str) {
+        let scene = self.next_scene_name();
+
+        self.push_action(
+            webgal::ChooseAction {
+                file: scene.clone(),
+                text: text.to_string(),
+            }
+            .into(),
+        );
+
+        self.scenes.push(Scene::new(&scene));
+    }
+
+    /// 修改背景
+    fn display_background(&mut self, res: &bestdori::Resource, next: bool) -> PreResult<()> {
+        let res = self.resolver.resolve_normal(res, ResourceType::Image)?;
+        let path = res.relative_path();
+
+        // 修改上下文
+        self.context.background = Some(path.clone());
+
+        // 显示背景
+        self.push_action(
+            webgal::ChangeBgAction {
+                image: Some(path),
+                next,
+            }
+            .into(),
+        );
+
+        self.try_push_resource(res);
+
+        Ok(())
+    }
+
+    /// 呈现卡面
+    fn display_cardstill(&mut self, res: &bestdori::Resource, next: bool) -> PreResult<()> {
+        let res = self.resolver.resolve_normal(res, ResourceType::Image)?;
+
+        // 记录并清空场景
+        let ctx = self.clear();
+
+        // 显示背景
+        self.push_action(
+            webgal::ChangeBgAction {
+                image: Some(res.relative_path()),
+                next,
+            }
+            .into(),
+        );
+
+        // 恢复场景
+        self.set_context(ctx);
+
+        self.try_push_resource(res);
+
+        Ok(())
+    }
 
     /// 执行模型动作
     ///
@@ -167,8 +386,8 @@ impl<R: Resolver> Transpiler<R> {
         );
     }
 
-    /// 修改模型动作
-    fn display_motion(&mut self, motion: &Motion, next: bool) -> PreResult<()> {
+    /// 修改模型动作 (当模型存在时)
+    fn try_display_motion(&mut self, motion: &Motion, next: bool) -> PreResult<()> {
         let Motion {
             character,
             motion,
@@ -188,15 +407,43 @@ impl<R: Resolver> Transpiler<R> {
             })
             .map(|model| self.display_model(*character, model, next)) // 应用修改
     }
+
+    /// 修改模型动作 (模型一定存在)
+    fn display_motion_unwrap(&mut self, motion: &Motion, next: bool) {
+        self.try_display_motion(motion, next).unwrap();
+    }
+
+    /// 修改模型动作 (不存在时插入模型)
+    fn display_motion(&mut self, model: &str, motion: &Motion, next: bool) {
+        let _ = self.context.models.try_insert(
+            motion.character,
+            ModelBuilder::default()
+                .path(model.to_string())
+                .build()
+                .unwrap(),
+        );
+
+        let _ = self.try_display_motion(motion, next);
+    }
+
+    /// 移除模型
+    fn remove_model(&mut self, id: u8, next: bool) -> PreResult<()> {
+        match self.context.models.remove(&id) {
+            Some(_) => {
+                return_ok! {self.push_action(webgal::ChangeFigureAction::new_hide(id, next).into())}
+            }
+            None => Err(TranspileErrorKind::UninitFigure(id)),
+        }
+    }
 }
 
-impl<R: Resolver + Default> Default for Transpiler<R> {
+impl<R: Resolve + Default> Default for Transpiler<R> {
     fn default() -> Self {
         Self::new(R::default())
     }
 }
 
-impl<R: Resolver> TranspilerTrait for Transpiler<R> {
+impl<R: Resolve> Transpile for Transpiler<R> {
     fn transpile(mut self, story: &bestdori::Story) -> TranspileResult {
         let errors = story
             .iter_with_wait()

@@ -2,6 +2,7 @@
 
 use std::fmt::{self, Display};
 
+use derive_builder::Builder;
 use serde::Serialize;
 use webgal_derive::{ActionCustom, Actionable};
 
@@ -25,16 +26,6 @@ pub enum FigureSide {
     Right,
 }
 
-impl From<LayoutSideType> for FigureSide {
-    fn from(value: LayoutSideType) -> Self {
-        match value {
-            LayoutSideType::Center => Self::Center,
-            LayoutSideType::LeftOver | LayoutSideType::LeftInside => Self::Left,
-            LayoutSideType::RightOver | LayoutSideType::RightInside => Self::Right,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Position {
     pub x: i16,
@@ -46,7 +37,7 @@ pub struct Transform {
 }
 
 impl Transform {
-    pub fn new_x(x: i16) -> Self {
+    pub fn new_with_x(x: i16) -> Self {
         Self {
             position: Position { x },
         }
@@ -116,7 +107,7 @@ impl ActionCustom for SetTextboxAction {
 }
 
 /// 切换立绘
-#[derive(Debug, Clone, Actionable)]
+#[derive(Debug, Clone, Default, Builder, Actionable)]
 #[action(head = "changeFigure", main = "single", custom)]
 pub struct ChangeFigureAction {
     #[action(main, nullable, none)]
@@ -137,13 +128,9 @@ pub struct ChangeFigureAction {
 impl ChangeFigureAction {
     pub fn new_hide(id: u8, next: bool) -> Self {
         Self {
-            model: None,
             id,
             next,
-            side: FigureSide::default(),
-            transform: None,
-            motion: None,
-            expression: None,
+            ..Default::default()
         }
     }
 }
@@ -171,7 +158,7 @@ pub struct SetEffectAction {
 }
 
 /// 切换背景
-#[derive(Debug, Clone, Actionable)]
+#[derive(Debug, Clone, Default, Actionable)]
 #[action(head = "changeBg", main = "single")]
 pub struct ChangeBgAction {
     #[action(main, nullable, none)]
@@ -209,64 +196,68 @@ pub struct SetAnimation {
 }
 
 #[test]
+#[cfg(test)]
 fn test_action_serialize() {
-    let choose = ChooseAction {
-        file: String::from("start.txt"),
-        text: String::from("???"),
-    };
-
-    let say = SayAction {
-        name: String::from("Soyo"),
-        text: String::from("ごきげんよう~"),
-        next: true,
-        character: Some(39),
-    };
-
-    let change_figure = ChangeFigureAction {
-        model: Some(String::from("036_casual-2023")),
-        id: 36,
-        next: false,
-        side: FigureSide::Left,
-        transform: Some(Transform {
-            position: Position { x: 0 },
-        }),
-        motion: Some(String::from("angry01")),
-        expression: Some(String::from("angry01")),
-    };
-
-    let change_bg = ChangeBgAction {
-        image: None,
-        next: false,
-    };
-
-    let bgm = BgmAction {
-        sound: Some(String::from("01. ショパン「雨だれ」.flac")),
-    };
-
-    let set_animation = SetAnimation {
-        animation: String::from("rgbFilm"),
-        target: String::from("bg-main"),
-        next: true,
-    };
-
-    assert_eq!(choose.to_string(), r#"choose:???:start.txt;"#);
+    assert_eq!(
+        ChooseAction {
+            file: String::from("start.txt"),
+            text: String::from("???"),
+        }
+        .to_string(),
+        r#"choose:???:start.txt;"#
+    );
 
     assert_eq!(
-        say.to_string(),
+        SayAction {
+            name: String::from("Soyo"),
+            text: String::from("ごきげんよう~"),
+            next: true,
+            character: Some(39),
+        }
+        .to_string(),
         r#"Soyo:ごきげんよう~ -notend -id -figureId=39;"#
     );
 
     assert_eq!(
-        change_figure.to_string(),
+        ChangeFigureAction {
+            model: Some(String::from("036_casual-2023")),
+            id: 36,
+            next: false,
+            side: FigureSide::Left,
+            transform: Some(Transform {
+                position: Position { x: 0 },
+            }),
+            motion: Some(String::from("angry01")),
+            expression: Some(String::from("angry01")),
+        }
+        .to_string(),
         r#"changeFigure:036_casual-2023 -id=36 -transform={"position":{"x":0}} -motion=angry01 -expression=angry01 -left;"#
     );
 
-    assert_eq!(change_bg.to_string(), r#"changeBg:none;"#);
-
-    assert_eq!(bgm.to_string(), r#"bgm:01. ショパン「雨だれ」.flac;"#);
+    assert_eq!(
+        ChangeBgAction {
+            image: None,
+            next: false,
+        }
+        .to_string(),
+        r#"changeBg:none;"#
+    );
 
     assert_eq!(
-        set_animation.to_string(),
+        BgmAction {
+            sound: Some(String::from("01. ショパン「雨だれ」.flac")),
+        }
+        .to_string(),
+        r#"bgm:01. ショパン「雨だれ」.flac;"#
+    );
+
+    assert_eq!(
+        SetAnimation {
+            animation: String::from("rgbFilm"),
+            target: String::from("bg-main"),
+            next: true,
+        }
+        .to_string(),
         r#"setAnimation:rgbFilm -target=bg-main -next;"#
     );
 }

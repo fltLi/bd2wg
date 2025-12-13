@@ -2,9 +2,11 @@
 
 use std::{ops::Deref, sync::Arc};
 
-use crate::error::*;
+use crate::error::ResolveError;
 use crate::impl_deref_for_asref;
 use crate::models::{bestdori, webgal};
+
+pub type ResolveResult<T> = Result<T, ResolveError>;
 
 /// 常规资源解析类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -43,13 +45,13 @@ impl_deref_for_asref! {ResourceEntry, webgal::Resource}
 /// 解析 Bestdori 资源为 WebGAL 资源 + 下载链接.
 ///
 /// 解析器会自动去重, 避免重复资源下载.
-pub trait Resolver {
+pub trait Resolve {
     /// 解析常规资源
     fn resolve_normal(
         &mut self,
         res: &bestdori::Resource,
         kind: ResourceType,
-    ) -> Result<ResourceEntry>;
+    ) -> ResolveResult<ResourceEntry>;
 
     /// 解析 Live2D 资源
     fn resolve_model(&mut self, costume: &str) -> ResourceEntry;

@@ -12,7 +12,7 @@ use crate::traits::handle::Handle;
 /// 同时, 下载器也是管理所有任务的生命周期的任务句柄.
 ///
 /// 建议下载器内部管理基础下载任务池, 接受每个任务句柄的调用.
-pub trait Downloader: Handle<Result = ()> {
+pub trait Download: Handle<Result = ()> {
     /// 启动下载任务
     fn download(&mut self, res: impl AsRef<Resource>) -> Box<dyn Handle<Result = Result<()>>>;
 }

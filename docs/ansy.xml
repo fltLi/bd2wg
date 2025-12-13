@@ -3,51 +3,19 @@
 <content>
 
 <preface>
-    大概是一份粮单
-    ---
-
-    ### 收录条件
-    - 含有 ansy, 不含对家
-    - 不短且作者看过
-    - 觉得非常好 / 特点鲜明的作品
-
-    ### 内容说明
-    以灵活且松散的方式归档了收录的作品.
-    有片段摘录和评论, 作者文笔不好, 写不出好的评论, 若您能编辑, 感激不尽.
+    大概是一份爱素粮单.
 </preface>
 
 <works>
     <work>
         <name>It's My Cry!!!!!!!!</name>
         <platform note="补档">bilibili</platform>
-        <remark>
-            一上来就是很有争议的作品啊...
-            可马老师这篇作品是真的好, 无论是剧情还是 CG.
-            我还记得加 WebGAL 同好群是填的最喜欢的二创就是这部.
-        </remark>
-        <excerpt>
-            如果犯错了, 就改正错误; 如果遇到了困难, 就找到解决办法
-            如果......在庞大繁杂的迷宫中迷路了......
-            ......回头, 也并不是意味着逃避......
-            ......回头, 也意味着发现了新的一条走不通的路, 意味着新的前进方向......
-        </excerpt>
     </work>
 
     <work>
         <name>即便这就是你的一辈子</name>
         <platform>scp-cn</platform>
         <associate>致亚麻色头发的少女</associate>
-        <remark>
-            真的很沉重, 每次读的时候总是会让人陷入无尽的孤独中.
-            顺便推荐去看下 cn3k 的其他获奖作品, 真的非常好看 (虽然不是 ansy).
-            猜猜看从发现到看完花了多久?
-        </remark>
-        <excerpt>
-            并非是不理解根本无法传达这件事
-            永生（卫星）之光溃碎于银河中
-            仅凭话语无法传唱超然颂歌的我们
-            就任由感情恣意倾倒直到庞加莱回归吧
-        </excerpt>
     </work>
 
     <work>
@@ -55,144 +23,80 @@
         <platform>lofter</platform>
         <platform note="更新中">bilibili</platform>
         <asssociate>拥有催眠 app 的灰爱 与 病娇素世</asssociate>
-        <remark>
-            老师说的好, 我确实没见过更扭的作品了.
-            全文有扭曲有甜饼, 叙事很宏大, 细节很充实, 画面感非常强.
-            以及奇怪的是, 我觉得祥爹最后一战的画面超感人的说.
-        </remark>
     </work>
 
     <work>
         <name>天际线</name>
         <platform note="更新中">bilibili</platform>
-        <remark>
-            这是一个充满了遗憾, 坎坎坷坷, 关于背叛者与逃避的故事.
-            天际线的本质是无数的不确定性, 但爱与羁绊一定能战胜这一切, 一向如此, 不是吗?
-            一定会是 HE 的吧.
-        </remark>
     </work>
 
     <work>
         <name>假如千早爱音回到过去</name>
         <platform>bilibili</platform>
-        <remark>
-            量大管饱!
-            情节跌宕起伏, 每个场景的渲染都非常精彩, 也有作者的互动.
-            刚入坑就摄入大量糖分是什么感觉呢? 我总想回忆起来.
-        </remark>
     </work>
 
     <work>
         <name>星遗物</name>
         <platform>lofter</platform>
         <platform>bilibili</platform>
-        <remark>
-            时间线收束中爱素二人的相互救赎, 元老级作品, 一定要去看!
-        </remark>
     </work>
 
     <work>
         <name>命砂時</name>
         <platform>lofter</platform>
-        <remark>
-            坏结局螺旋和好结局未定都是非常触动人心的结局.
-            虽然在不同作品里都有很多爱素互相献身的桥段, 但每次读到都总会有新的更强烈的感受.
-        </remark>
     </work>
 
     <work>
         <name>夜时计</name>
         <platform note="更新中">lofter</platform>
         <platform note="更新中">bilibili</platform>
-        <remark>
-            是直球素世将爱音一步一步救赎的故事啊.
-            作者的文笔很清新, 写出了另一种风格的轮回系作品.
-            即使忘记一切, 两人也会在一起的吧, 这就是命运啊.
-        </remark>
     </work>
 
     <work>
         <name>致没带伞的你</name>
         <platform note="更新中">bilibili</platform>
-        <remark>
-            诗一样的作品, 氛围感很强 (配乐超棒的说).
-            色调温馨且治愈的日常向作品, 字句中阐述着爱素的幸福理论.
-        </remark>
     </work>
 
     <work>
         <name>百年 MyGO / 长崎素世的一生</name>
         <platform note="更新中">bilibili</platform>
-        <remark>
-            神秘题材的作品, 科幻而不张扬.
-            作者以素世视角, 贯穿始终地阐述了素世眼中的爱音与 MyGO.
-            虽然这么说有点奇怪, 但看下来我觉得是一篇十分温馨柔和的作品.
-        </remark>
     </work>
 
     <work>
         <name>千早爱音重生三年后却变成冷面雇佣兵</name>
         <platform>bilibili</platform>
-        <remark>
-            虽然标题看起来很夸张, 但是实际是部写的很好的作品哦.
-            尽管没有很出众的技术力, 但充满质感.
-            最后 go 团的大家与爱音相认的感人至极.
-        </remark>
     </work>
 
     <work>
         <name>永日与残月——破碎人偶的爱之光</name>
         <platform>bilibili</platform>
         <associate>星之门——回光笺</associate>
-        <remark>
-            是一步一步带着素世战胜心魔, 走向未来的爱音啊.
-            而且星之门还有配音!
-        </remark>
     </work>
 
     <work>
         <name>二周目ansy, 但是重返高中.</name>
         <platform>lofter</platform>
         <platform>bilibili</platform>
-        <remark>
-            不同于二周目普遍的沉重, 这是相当轻快的日常系作品.
-        </remark>
     </work>
 
     <work>
         <name>假如千早爱音是心理医生</name>
         <platform>bilibili</platform>
-        <remark>
-            很新颖的题材, 大概算是日常向吧?
-        </remark>
     </work>
 
     <work>
         <name>两者都是病娇系列</name>
         <platform>bilibili</platform>
-        <remark>
-            Happy Sugar Life!
-        </remark>
     </work>
 
     <work>
         <name>皆杀的初华但大家都不是普通人</name>
         <platform>bilibili</platform>
-        <remark>
-            一整天都看不完的作品.
-            虽然剧中初华坏事干尽, 但最后也好事干尽了吧.
-            作品成分十分复杂, 世界观十分庞大, 剧情非常精彩, 如果要看一定要抽出连续的时间来!
-            此外, 作者对每个人物都有生动的描写, 真的非常用心!
-        </remark>
     </work>
 
     <work>
         <name>爱音的前世是大英特工？</name>
         <platform>bilibili</platform>
-        <remark>
-            冷战 + 转世背景的作品, 剧情也十分精彩.
-            爱素两人一定要每一辈子都在一起啊!
-        </remark>
     </work>
 
     <work>
@@ -204,103 +108,45 @@
         <associate>少女与余命少女之旅</associate>
         <associate>花海精灵不会爱上村娘S</associate>
         <associate>从伦敦逃走后能拯救异世界吗？</associate>
-        <remark>
-            不同平行世界的 ansy 故事.
-            不难发现, 每一部作品都是作者用心制作的, 无论是剧情还是技术都很强.
-            爱素二人围绕遗忘与创造, 开启了一场又一场精彩的冒险.
-            全部都是 HE 哦!
-            以及, 原来的《千早爱音穿越异世界》合集怎么没了?
-        </remark>
     </work>
 
     <work>
         <name>我在 7 年后等你</name>
         <platform note="计划出续集">bilibili</platform>
-        <remark>
-            虽然写着是基于七年后这部 gal 的世界观, 但完完整整是 MyGO 的大家所书写的故事.
-            这是一部十分优秀的二创, 随着主角们的不断探索, 渐渐揭开故事的神秘面纱.
-            全文没有激烈的对抗, 但却让人深感命运的无奈, 但最终还是迎来了好结局, 这是每个人物努力的结果.
-            所有, 一定要珍惜自己的生命! 珍惜这个世界!
-        </remark>
     </work>
 
     <work>
         <name>致化作光明的你</name>
         <platform>lofter</platform>
-        <remark>
-            发生在迷途空间站的故事.
-            虽说是科幻, 但情感上的描写非常细腻, 对人物形象的刻画非常用心.
-            作者笔下星空是一个非常出色的意象, 绝妙的映衬了迷子们的过去, 现在和未来.
-            为什么这么好的文章还没有视频化呢?
-        </remark>
-        <excerpt>
-            .. -- .. ... ... -.-- --- ..-
-            我想你。
-            我知道，你和我，一定都不会忘记彼此。
-            .. - .-. ..- ... - -.-- --- ..-
-            我相信你。
-            我知道，如果是你的话，一定会跨越恐惧伸手救我。
-            我知道，如果是你的话，一定不会被星空轻易打败。
-            .. .-.. --- ...- . -.-- --- ..-
-            我爱你。
-            我爱你。
-        </excerpt>
     </work>
 
     <work>
         <name>mygo 伪人</name>
         <platform>bilibili</platform>
-        <remark>
-            是的你没看错这是 ansy (伪爱 x 伪素).
-            虽然部分场面着实猎奇 (但这是作品特色的说...), 但作品蕴含了自我, 本我, 超我的深刻讨论.
-            因此, 当你看到最后时 (应该是 HE), 一定会有深刻感触的.
-        </remark>
-        <excerpt>
-            从今以后, 我们会活在风中、雨中, 此世间一切的海洋大地与天空中.
-        </excerpt>
     </work>
 
     <work>
         <name>SCP-CN-4000+</name>
         <platform note="https://scp-wiki-cn.wikidot.com/scp-cn-4000j-j">scp-cn</platform>
-        <remark>
-            我没说不收录搞笑内容...
-            此归档里已经出现了两部 scp 作品, 其实就像 "https://scp-wiki-cn.wikidot.com/panopticon" 中诗蔻蒂所说: 
-            "我，诗蔻蒂=法塔莉斯，作为【同人】这个概念的神祇，能存在于基金会的叙事，就说明基金会本身只是一个巨大的同人创作, ...(后略)"
-        </remark>
     </work>
 
     <work>
         <name>彩虹的尽头</name>
-        <platform note="更新中">bilibili</platform>
-        <remark>
-            千年狐妖与小太阳花之精灵相遇与相互拯救的故事, 非常温馨 (一定会是 HE 的).
-        </remark>
+        <platform>bilibili</platform>
     </work>
 
     <work>
         <name>穿越时空的爱音</name>
         <platform note="更新中">bilibili</platform>
-        <remark>
-            全名: 穿越时空拯救素世的爱音.
-            跨越类的作品确实很吸引人, 但比起与不同世界观的联动, 这部作品出彩地塑造了每一个人物的形象.
-            以及, 在似乎看不到头的旅行中, 观众们也见证了爱音心中的变化与坚守, 值得一看!
-        </remark>
     </work>
 
     <work>
         <name>千早爱音的土拨鼠之日</name>
         <platform note="互动视频, 计划出剧场版">bilibili</platform>
         <associate>长崎素世的月之暗面</associate>
-        <remark>
-            超级高质量的二创, 也是少有的互动视频类二创 (爱杀也是哦).
-            记得我当初靠自己打通全结局是有多么的困难 (虽然月之暗面我只通了 2 个结局...).
-            虽然开头有点虐, 但到后面是实打实的爱素, 所有放心去看吧.
-            p.s. 还有很多独特的港风 cg, 配音也非常多, 如果要看请保证有充足的时间以获得最好的体验.
-        </remark>
     </work>
 
-    <!--施工中... 下周末继续摸鱼做归档-->
+    <!--施工中...-->
 </works>
 
 </content>

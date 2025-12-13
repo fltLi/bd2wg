@@ -1,5 +1,6 @@
 //! bd2wg 业务逻辑
 
+#![feature(map_try_insert)]
 #![allow(dead_code, unused_imports, unused_macros)]
 
 pub mod error;

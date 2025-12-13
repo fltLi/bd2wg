@@ -10,7 +10,7 @@ use crate::models::bestdori::{
     BESTDORI_ASSET_URL_SE,
 };
 use crate::models::webgal;
-use crate::traits::resolver::{Resolver as ResolverTrait, ResourceEntry, ResourceType};
+use crate::traits::resolve::*;
 use crate::utils::{gen_name_from_url, lower_first_alphabetic};
 
 const RESOURCE_IMAGE_EXTEND: &str = ".png";
@@ -51,8 +51,8 @@ impl Resolver {
     fn get_or_insert(
         &mut self,
         key: ResourceKey,
-        call: impl FnOnce() -> Result<webgal::Resource>,
-    ) -> Result<ResourceEntry> {
+        call: impl FnOnce() -> ResolveResult<webgal::Resource>,
+    ) -> ResolveResult<ResourceEntry> {
         Ok(match self.resource.entry(key) {
             // 解析并保存, 返回拷贝的指针
             Entry::Vacant(v) => ResourceEntry::Vacant(v.insert(Arc::new(call()?)).clone()),
@@ -189,19 +189,16 @@ impl Resolver {
     }
 }
 
-impl ResolverTrait for Resolver {
+impl Resolve for Resolver {
     fn resolve_normal(
         &mut self,
         res: &bestdori::Resource,
         kind: ResourceType,
-    ) -> Result<ResourceEntry> {
+    ) -> ResolveResult<ResourceEntry> {
         self.get_or_insert(ResourceKey::Normal(res.clone(), kind), || {
-            Self::resolve(res, kind).ok_or_else(|| {
-                ResolveError {
-                    kind,
-                    resource: res.clone(),
-                }
-                .into()
+            Self::resolve(res, kind).ok_or_else(|| ResolveError {
+                kind,
+                resource: res.clone(),
             })
         })
     }

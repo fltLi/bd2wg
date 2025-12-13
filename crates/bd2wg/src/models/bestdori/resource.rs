@@ -46,6 +46,7 @@ pub struct Resource {
 }
 
 #[test]
+#[cfg(test)]
 fn test_resource_serialize() {
     let data = Resource {
         kind: ResourceType::Bandori,

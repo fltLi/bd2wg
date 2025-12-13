@@ -51,6 +51,15 @@ macro_rules! impl_deref_for_asref {
     };
 }
 
+/// 执行表达式, 返回 Ok(())
+#[macro_export]
+macro_rules! return_ok {
+    ($expr:expr) => {{
+        let _ = $expr;
+        Ok(())
+    }};
+}
+
 /// 从请求头快速创建 Client
 pub fn new_client_with_headers(headers: HeaderMap) -> reqwest::Result<Client> {
     Client::builder().default_headers(headers).build()

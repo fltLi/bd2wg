@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::models::webgal::FigureSide;
+
 use super::*;
 
 /// Bestdori 脚本指令
@@ -79,7 +81,7 @@ pub struct EffectAction {
     pub effect: Effect,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LayoutType {
     Appear,
@@ -87,7 +89,7 @@ pub enum LayoutType {
     Move,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LayoutSideType {
     LeftInside,
@@ -95,6 +97,16 @@ pub enum LayoutSideType {
     Center,
     RightInside,
     RightOver,
+}
+
+impl From<LayoutSideType> for FigureSide {
+    fn from(value: LayoutSideType) -> Self {
+        match value {
+            LayoutSideType::LeftInside | LayoutSideType::LeftOver => Self::Left,
+            LayoutSideType::Center => Self::Center,
+            LayoutSideType::RightInside | LayoutSideType::RightOver => Self::Right,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
