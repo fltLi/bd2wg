@@ -9,6 +9,7 @@ license.workspace = true
 webgal-derive = { path = "../webgal-derive" }
 webgal-derive-macro = { path = "../webgal-derive-macro" }
 paste.workspace = true
+anyhow.workspace = true
 thiserror.workspace = true
 derive_builder.workspace = true
 strum.workspace = true

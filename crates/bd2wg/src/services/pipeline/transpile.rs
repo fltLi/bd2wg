@@ -42,7 +42,7 @@ fn run_pipeline(
         ($expr:expr) => {
             match $expr {
                 Ok(v) => v,
-                Err(e) => return (vec![Error::Initialize(e.into())], Vec::new()),
+                Err(e) => return (vec![Error::File(e.into())], Vec::new()),
             }
         };
     }
@@ -73,7 +73,7 @@ fn run_pipeline(
         false_or_panic! {cancel}
 
         if let Err(e) = create_and_write(scene.to_string(), &scene.absolute_path(root)) {
-            errors.push(Error::Initialize(e.into()));
+            errors.push(Error::File(e.into()));
         }
     }
 
@@ -89,12 +89,12 @@ pub struct TranspilePipeline {
     handle: Option<JoinHandle<(Vec<Error>, Vec<Arc<Resource>>)>>,
 
     root: PathBuf,
-    headers: Option<HeaderMap>, // 传递给下载管线
+    header: Option<HeaderMap>, // 传递给下载管线
 }
 
 impl TranspilePipeline {
     /// 启动转译管线
-    pub fn new(story: impl AsRef<Path>, root: impl AsRef<Path>, headers: HeaderMap) -> Box<Self> {
+    pub fn new(story: impl AsRef<Path>, root: impl AsRef<Path>, header: HeaderMap) -> Box<Self> {
         let cancel = Arc::new(AtomicBool::new(false));
         let state: Arc<RwLock<TranspileState>> = Arc::default();
 
@@ -103,7 +103,7 @@ impl TranspilePipeline {
             state: state.clone(),
             handle: None,
             root: root.as_ref().to_path_buf(),
-            headers: Some(headers),
+            header: Some(header),
         });
 
         pipe.handle = Some({
@@ -130,7 +130,7 @@ impl Handle for TranspilePipeline {
 
         (
             TranspileResult { state, errors },
-            DownloadPipeline::new(&self.root, self.headers.take().unwrap(), res)
+            DownloadPipeline::new(&self.root, self.header.take().unwrap(), res)
                 .map(|pipe| -> Box<dyn DownloadPipelineTrait> { pipe }),
         )
     }

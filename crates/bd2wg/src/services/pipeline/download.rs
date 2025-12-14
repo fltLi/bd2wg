@@ -91,10 +91,10 @@ impl DownloadPipeline {
     /// 启动下载管线
     pub fn new(
         root: impl AsRef<Path>,
-        headers: HeaderMap,
+        header: HeaderMap,
         res: Vec<Arc<Resource>>,
     ) -> Result<Box<Self>> {
-        let downloader = Downloader::new(root, headers)?;
+        let downloader = Downloader::new(root, header)?;
 
         let cancel = Arc::new(AtomicBool::new(false));
         let state = Arc::new(RwLock::new(DownloadState {

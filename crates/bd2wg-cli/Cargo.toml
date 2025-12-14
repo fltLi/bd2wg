@@ -6,3 +6,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+bd2wg = { path = "../bd2wg" }
+anyhow.workspace = true
+indicatif = "*"

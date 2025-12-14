@@ -125,7 +125,7 @@ impl Drop for DownloadTask {
 /// 详细说明参考 run() 方法注释.
 struct DownloadPoolWorker {
     count: usize,
-    headers: HeaderMap, // 保存请求头以支持重新创建 Client
+    header: HeaderMap, // 保存请求头以支持重新创建 Client
     client: Client,
     cancel: Arc<AtomicBool>,
     receiver: Receiver<DownloadCommand>,
@@ -134,8 +134,8 @@ struct DownloadPoolWorker {
 
 impl DownloadPoolWorker {
     /// 创建 (但不运行) 下载池内部管理
-    fn new(headers: HeaderMap) -> PoolResult<(Self, Arc<AtomicBool>, Sender<DownloadCommand>)> {
-        let client = new_client_with_headers(headers.clone())?;
+    fn new(header: HeaderMap) -> PoolResult<(Self, Arc<AtomicBool>, Sender<DownloadCommand>)> {
+        let client = new_client_with_header(header.clone())?;
 
         let cancel = Arc::new(AtomicBool::new(false));
         let (sender, receiver) = channel();
@@ -143,7 +143,7 @@ impl DownloadPoolWorker {
         Ok((
             Self {
                 count: 0,
-                headers,
+                header,
                 client,
                 cancel: cancel.clone(),
                 receiver,
@@ -195,7 +195,7 @@ impl DownloadPoolWorker {
         if self.count >= CLIENT_RESTART_FAILURE_THRESHOLD {
             // 等待一段时间再尝试重建 client
             sleep(CLIENT_RESTART_BACKOFF);
-            if let Ok(client) = new_client_with_headers(self.headers.clone()) {
+            if let Ok(client) = new_client_with_header(self.header.clone()) {
                 self.client = client;
             }
             // 清空连续失败计数
@@ -297,8 +297,8 @@ pub struct DownloadPool {
 
 impl DownloadPool {
     /// 根据请求头启动下载池
-    pub fn new(headers: HeaderMap) -> PoolResult<Box<Self>> {
-        let (worker, cancel, sender) = DownloadPoolWorker::new(headers)?;
+    pub fn new(header: HeaderMap) -> PoolResult<Box<Self>> {
+        let (worker, cancel, sender) = DownloadPoolWorker::new(header)?;
         let handle = thread::spawn(move || worker.run());
 
         Ok(Box::new(Self {

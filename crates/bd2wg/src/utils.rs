@@ -2,7 +2,14 @@
 
 use std::{fs, path::Path};
 
-use reqwest::{blocking::Client, header::HeaderMap};
+use reqwest::{
+    blocking::Client,
+    header::{HeaderMap, HeaderName, HeaderValue},
+};
+use serde_json::Value;
+
+/// 默认请求头路径
+pub const DEFAULT_HEADER_PATH: &str = "./assets/header.json";
 
 /// 为 Handle 实现 cancel Drop
 #[macro_export]
@@ -85,7 +92,7 @@ macro_rules! return_ok {
 #[macro_export]
 macro_rules! false_or_panic {
     ($atom:expr) => {
-        false_or_panic! {$atom, "cancel"}
+        false_or_panic! {$atom, "canceled."}
     };
     ($atom:expr, $text:expr) => {
         if $atom.load(std::sync::atomic::Ordering::Relaxed) {
@@ -94,7 +101,7 @@ macro_rules! false_or_panic {
     };
 
     ($atom:ident) => {
-        false_or_panic! {$atom, "cancel"}
+        false_or_panic! {$atom, "canceled."}
     };
     ($atom:ident, $text:literal) => {
         if $atom.load(std::sync::atomic::Ordering::Relaxed) {
@@ -104,8 +111,8 @@ macro_rules! false_or_panic {
 }
 
 /// 从请求头快速创建 Client
-pub fn new_client_with_headers(headers: HeaderMap) -> reqwest::Result<Client> {
-    Client::builder().default_headers(headers).build()
+pub fn new_client_with_header(header: HeaderMap) -> reqwest::Result<Client> {
+    Client::builder().default_headers(header).build()
 }
 
 /// 创建完整路径, 将字节写入文件
@@ -140,4 +147,39 @@ pub fn lower_first_alphabetic(s: &str) -> String {
             c
         })
         .collect()
+}
+
+/// 从 json 构建 HeaderMap
+pub fn new_header_from_json(val: &Value) -> anyhow::Result<HeaderMap> {
+    let mut map = HeaderMap::new();
+
+    if let Value::Object(obj) = val {
+        for (k, val) in obj {
+            if k.starts_with(':') {
+                continue;
+            }
+
+            let s = if let Some(s) = val.as_str() {
+                s.to_string()
+            } else {
+                val.to_string()
+            };
+
+            let name = HeaderName::from_bytes(k.as_bytes())?;
+            let hv = HeaderValue::from_str(&s)?;
+            map.insert(name, hv);
+        }
+    }
+
+    Ok(map)
+}
+
+/// 解析 json 并构建 HeaderMap
+pub fn new_header_from_bytes(bytes: &[u8]) -> anyhow::Result<HeaderMap> {
+    new_header_from_json(&serde_json::from_slice(bytes)?)
+}
+
+/// 解析默认请求头
+pub fn default_header() -> anyhow::Result<HeaderMap> {
+    new_header_from_bytes(&fs::read(DEFAULT_HEADER_PATH)?)
 }

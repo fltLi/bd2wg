@@ -36,9 +36,9 @@ pub fn derive_actionable(input: TokenStream) -> TokenStream {
     let fields = match input.data {
         Data::Struct(data) => match data.fields {
             Fields::Named(fields) => fields.named,
-            _ => panic!("仅支持具名字段结构体"),
+            _ => panic!("Only named-field structs are supported"),
         },
-        _ => panic!("仅支持结构体"),
+        _ => panic!("Only structs are supported"),
     };
 
     let field_infos: Vec<_> = fields.into_iter().map(parse_field_attrs).collect();
@@ -121,7 +121,7 @@ struct FieldInfo {
 }
 
 fn parse_field_attrs(field: syn::Field) -> FieldInfo {
-    let ident = field.ident.expect("字段必须有标识符");
+    let ident = field.ident.expect("Field must have an identifier");
     let ty = field.ty;
     let mut main = false;
     let mut arg = None;
@@ -175,7 +175,7 @@ fn parse_field_attrs(field: syn::Field) -> FieldInfo {
     }
 
     if none && arg.as_deref() == Some("tag") {
-        panic!("#[action(none)] 不能与 #[action(arg = \"tag\")] 同时使用");
+        panic!("#[action(none)] cannot be used with #[action(arg = \"tag\")]");
     }
 
     FieldInfo {
@@ -267,7 +267,9 @@ fn gen_main_part(
 
     let main_field = field_infos.iter().find(|info| info.main);
     let Some(main_field) = main_field else {
-        panic!("结构体 {name} 设置了 main = \"{main_type}\" 但未标记 #[action(main)] 字段");
+        panic!(
+            "Struct {name} sets main = \"{main_type}\" but has no field marked with #[action(main)]"
+        );
     };
 
     let field_ident = &main_field.ident;
@@ -335,7 +337,7 @@ fn gen_main_part(
                 }
             }
         }
-        _ => panic!("无效的 main 类型: {main_type}"),
+        _ => panic!("Invalid main type: {main_type}"),
     }
 }
 
@@ -490,7 +492,7 @@ fn gen_nullable_arg(
                 }
             }
         }
-        _ => panic!("无效的 arg 类型: {arg_type}"),
+        _ => panic!("Invalid arg type: {arg_type}"),
     }
 }
 

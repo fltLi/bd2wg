@@ -212,12 +212,12 @@ pub struct Downloader {
 
 impl Downloader {
     /// 在指定目录创建下载器
-    pub fn new(root: impl AsRef<Path>, headers: HeaderMap) -> Result<Self> {
+    pub fn new(root: impl AsRef<Path>, header: HeaderMap) -> Result<Self> {
         Ok(Self {
             root: root.as_ref().to_path_buf(),
             count: Arc::new(AtomicUsize::new(0)),
             pool: Some(Arc::new(Mutex::new(
-                DownloadPool::new(headers).map_err(DownloadError::from)?,
+                DownloadPool::new(header).map_err(DownloadError::from)?,
             ))),
         })
     }

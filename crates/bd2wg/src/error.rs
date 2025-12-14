@@ -6,35 +6,37 @@ use thiserror::Error;
 
 use crate::{models::bestdori, traits::resolve::ResourceType};
 
-/// bd2wg 标准返回类型
+/// bd2wg 返回类型
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// bd2wg 标准错误类型
+/// bd2wg 错误类型
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("初始化失败: {0}")]
-    Initialize(#[from] InitializeError),
+    #[error("File operation failed: {0}")]
+    File(#[from] FileError),
 
-    #[error("下载失败: {0}")]
+    #[error("Download failed: {0}")]
     Download(#[from] DownloadError),
 
-    #[error("转译失败: {0}")]
+    #[error("Transpile failed: {0}")]
     Transpile(#[from] TranspileError),
 }
 
-/// 初始化错误
+/// 文件操作错误
+///
+/// 读取并解析 Bestdori 脚本, 写入 WebGAL 脚本时发生.
 #[derive(Debug, Error)]
-pub enum InitializeError {
-    #[error("json 解析错误: {0}")]
+pub enum FileError {
+    #[error("JSON parse error: {0}")]
     SerdeJson(#[from] serde_json::Error),
 
-    #[error("文件读写失败: {0}")]
+    #[error("File I/O error: {0}")]
     Io(#[from] io::Error),
 }
 
 /// 下载错误
 #[derive(Debug, Error)]
-#[error("下载失败: {url} -> {path:?}: {error}")]
+#[error("Download failed: {url} -> {path:?}: {error}")]
 pub struct DownloadError {
     pub url: String,
     pub path: PathBuf,
@@ -75,19 +77,19 @@ impl From<DownloadErrorKind> for DownloadError {
 
 #[derive(Debug, Error)]
 pub enum DownloadErrorKind {
-    #[error("网络请求失败: {0}")]
+    #[error("Network request failed: {0}")]
     Reqwest(#[from] reqwest::Error),
 
-    #[error("json 解析错误: {0}")]
+    #[error("JSON parse error: {0}")]
     SerdeJson(#[from] serde_json::Error),
 
-    #[error("文件写入失败: {0}")]
+    #[error("File write failed: {0}")]
     Io(#[from] io::Error),
 }
 
-/// 资源解析错误
+/// 解析错误
 #[derive(Debug, Error)]
-#[error("无法解析资源: kind={kind:?}, resource={resource:?}")]
+#[error("Unable to resolve resource: kind={kind:?}, resource={resource:?}")]
 pub struct ResolveError {
     pub kind: ResourceType,
     pub resource: bestdori::Resource,
@@ -95,7 +97,7 @@ pub struct ResolveError {
 
 /// 转译错误
 #[derive(Debug, Error)]
-#[error("转译失败: {error}, action={action:?}")]
+#[error("Transpile failed: {error}, action={action:?}")]
 pub struct TranspileError {
     pub action: Box<bestdori::Action>,
     #[source]
@@ -104,12 +106,12 @@ pub struct TranspileError {
 
 #[derive(Debug, Error)]
 pub enum TranspileErrorKind {
-    #[error("未知指令")]
+    #[error("Unknown command")]
     Unknown,
 
-    #[error("调用未入场的人物模型: {0}")]
+    #[error("Uninitialized figure model called: {0}")]
     UninitFigure(u8),
 
-    #[error("资源解析失败: {0}")]
+    #[error("Resource resolve failed: {0}")]
     Resolve(#[from] ResolveError),
 }
