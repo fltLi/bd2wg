@@ -2,10 +2,12 @@
 
 use std::sync::Arc;
 
-use crate::error::*;
-use crate::models::{
-    bestdori,
-    webgal::{self, Resource},
+use crate::{
+    error::*,
+    models::{
+        bestdori,
+        webgal::{self, Resource},
+    },
 };
 
 /// 转译结果

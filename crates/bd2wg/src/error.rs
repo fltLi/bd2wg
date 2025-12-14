@@ -4,8 +4,7 @@ use std::{io, path::PathBuf};
 
 use thiserror::Error;
 
-use crate::models::bestdori;
-use crate::traits::resolve::ResourceType;
+use crate::{models::bestdori, traits::resolve::ResourceType};
 
 /// bd2wg 标准返回类型
 pub type Result<T> = std::result::Result<T, Error>;
@@ -13,14 +12,24 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// bd2wg 标准错误类型
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("json 处理失败: {0}")]
-    SerdeJson(#[from] serde_json::Error),
+    #[error("初始化失败: {0}")]
+    Initialize(#[from] InitializeError),
 
     #[error("下载失败: {0}")]
     Download(#[from] DownloadError),
 
     #[error("转译失败: {0}")]
     Transpile(#[from] TranspileError),
+}
+
+/// 初始化错误
+#[derive(Debug, Error)]
+pub enum InitializeError {
+    #[error("json 解析错误: {0}")]
+    SerdeJson(#[from] serde_json::Error),
+
+    #[error("文件读写失败: {0}")]
+    Io(#[from] io::Error),
 }
 
 /// 下载错误
@@ -68,6 +77,9 @@ impl From<DownloadErrorKind> for DownloadError {
 pub enum DownloadErrorKind {
     #[error("网络请求失败: {0}")]
     Reqwest(#[from] reqwest::Error),
+
+    #[error("json 解析错误: {0}")]
+    SerdeJson(#[from] serde_json::Error),
 
     #[error("文件写入失败: {0}")]
     Io(#[from] io::Error),

@@ -1,25 +1,27 @@
 //! Bestdori 下载器
 
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
-use std::time::Duration;
-use std::{fs, thread};
+use std::{
+    path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    thread::{self, JoinHandle, sleep},
+    time::Duration,
+};
 
 use reqwest::header::HeaderMap;
 
-use crate::error::*;
-use crate::impl_drop_for_handle;
-use crate::models::bestdori;
-use crate::models::webgal::{self, Resource, ResourceType, default_model_config_path};
-use crate::services::downloader::pool;
-use crate::traits::asset::Asset;
-use crate::traits::download::Download;
-use crate::traits::handle::Handle;
-use crate::utils::create_and_write;
+use crate::{
+    error::*,
+    false_or_panic, impl_drop_for_handle,
+    models::{
+        bestdori,
+        webgal::{self, Resource, ResourceType, default_model_config_path},
+    },
+    traits::{asset::Asset, download::Download, handle::Handle},
+    utils::*,
+};
 
 use super::pool::{DownloadHandle, DownloadPool};
 
@@ -30,7 +32,7 @@ const DOWNLOAD_JOIN_CHECK_BACKOFF: Duration = Duration::from_secs(1);
 struct CommonDownloadHandle {
     url: String,
     path: PathBuf,
-    handle: Option<DownloadHandle>,
+    handle: Option<Box<DownloadHandle>>,
 }
 
 impl Handle for CommonDownloadHandle {
@@ -39,7 +41,7 @@ impl Handle for CommonDownloadHandle {
     /// 等待下载任务完成
     ///
     /// panic: 下载器 / 句柄被调用 cancel.
-    fn join(mut self) -> Self::Result {
+    fn join(mut self: Box<Self>) -> Self::Result {
         self.handle
             .take()
             .unwrap()
@@ -74,8 +76,7 @@ struct Live2dDownloadWorker {
     path: PathBuf, // Live2D 资源根目录
     cancel: Arc<AtomicBool>,
     count: Arc<AtomicUsize>,
-    pool: Arc<Mutex<DownloadPool>>,
-    sender: Sender<Result<()>>,
+    pool: Arc<Mutex<Box<DownloadPool>>>,
 }
 
 impl Live2dDownloadWorker {
@@ -84,10 +85,9 @@ impl Live2dDownloadWorker {
         url: &str,
         path: &Path,
         count: Arc<AtomicUsize>,
-        pool: Arc<Mutex<DownloadPool>>,
-    ) -> (Self, Arc<AtomicBool>, Receiver<Result<()>>) {
+        pool: Arc<Mutex<Box<DownloadPool>>>,
+    ) -> (Self, Arc<AtomicBool>) {
         let cancel = Arc::new(AtomicBool::new(false));
-        let (sender, receiver) = channel();
 
         count.fetch_add(1, Ordering::Relaxed);
 
@@ -98,20 +98,13 @@ impl Live2dDownloadWorker {
                 cancel: cancel.clone(),
                 count,
                 pool,
-                sender,
             },
             cancel,
-            receiver,
         )
     }
 
-    /// 结束任务, 提供返回值
-    fn send(self, res: Result<()>) {
-        let _ = self.sender.send(res);
-    }
-
     /// (阻塞) 执行主循环
-    fn run(self) {
+    fn run(self) -> Result<()> {
         // 生成下载错误
         let download_error = |error| {
             Error::Download(DownloadError {
@@ -121,57 +114,39 @@ impl Live2dDownloadWorker {
             })
         };
 
-        /// 检查结果, 失败时退出
-        macro_rules! unwrap_or_exit {
-            ($result:expr) => {
-                match $result {
-                    Ok(v) => v,
-                    Err(e) => {
-                        self.send(Err(e));
-                        return;
-                    }
-                }
-            };
-        }
-
         // 获取 Live2D 配置
         let handle = self.pool.lock().unwrap().download(&self.url);
-        let resource = unwrap_or_exit! {
-            handle
+        let resource = handle
             .join()
             .map_err(download_error)
-            .and_then(|model| bestdori::Model::from_slice(&model))
+            .and_then(|model| {
+                bestdori::Model::from_slice(&model).map_err(|e| download_error(e.into()))
+            })
             .and_then(|model| {
                 // 解析为 WebGAL Live2D 配置文件
                 let (model, res) = webgal::Model::from_bestdori_model(model);
 
                 // 写入配置文件
                 create_and_write(
-                    &serde_json::to_vec_pretty(&model).map_err(Error::SerdeJson)?,
+                    &serde_json::to_vec_pretty(&model).map_err(|e| download_error(e.into()))?,
                     Path::new(&default_model_config_path(&self.path.to_string_lossy())),
                 )
                 .map_err(|e| download_error(e.into()))
                 .map(|_| res)
-            })
-        };
+            })?;
 
         // 下载相关资源
         for (url, path) in resource {
-            // 检查退出
-            if self.cancel.load(Ordering::Relaxed) {
-                return;
-            }
+            false_or_panic! {self.cancel}
 
             // 下载资源
             let handle = self.pool.lock().unwrap().download(&url);
-            unwrap_or_exit! {
-                handle.join().map_err(download_error).and_then(|bytes| {
-                    create_and_write(&bytes, &path).map_err(|err| download_error(err.into()))
-                })
-            };
+            handle.join().map_err(download_error).and_then(|bytes| {
+                create_and_write(&bytes, &path).map_err(|err| download_error(err.into()))
+            })?;
         }
 
-        self.send(Ok(()));
+        Ok(())
     }
 }
 
@@ -185,9 +160,8 @@ impl Drop for Live2dDownloadWorker {
 
 /// Live2D 下载任务句柄
 struct Live2dDownloadHandle {
-    handle: Option<JoinHandle<()>>,
     cancel: Arc<AtomicBool>,
-    receiver: Receiver<Result<()>>,
+    handle: Option<JoinHandle<Result<()>>>,
 }
 
 impl Live2dDownloadHandle {
@@ -196,28 +170,28 @@ impl Live2dDownloadHandle {
         url: &str,
         path: &Path,
         count: Arc<AtomicUsize>,
-        pool: Arc<Mutex<DownloadPool>>,
-    ) -> Self {
-        let (worker, cancel, receiver) = Live2dDownloadWorker::new(url, path, count, pool);
+        pool: Arc<Mutex<Box<DownloadPool>>>,
+    ) -> Box<Self> {
+        let (worker, cancel) = Live2dDownloadWorker::new(url, path, count, pool);
         let handle = thread::spawn(move || worker.run());
-        Self {
-            handle: Some(handle),
+
+        Box::new(Self {
             cancel,
-            receiver,
-        }
+            handle: Some(handle),
+        })
     }
 }
 
 impl Handle for Live2dDownloadHandle {
     type Result = Result<()>;
 
-    fn join(mut self) -> Self::Result {
-        let _ = self.handle.take().unwrap().join();
-        Ok(())
+    fn join(mut self: Box<Self>) -> Self::Result {
+        self.handle.take().unwrap().join().unwrap()
     }
 
     fn cancel(&mut self) {
         self.cancel.store(true, Ordering::Relaxed);
+        self.handle = None;
     }
 
     fn is_finished(&self) -> bool {
@@ -233,12 +207,12 @@ impl_drop_for_handle! {Live2dDownloadHandle}
 pub struct Downloader {
     root: PathBuf,
     count: Arc<AtomicUsize>, // Live2D 任务计数
-    pool: Option<Arc<Mutex<DownloadPool>>>,
+    pool: Option<Arc<Mutex<Box<DownloadPool>>>>,
 }
 
 impl Downloader {
     /// 在指定目录创建下载器
-    fn new<P: AsRef<Path>>(root: P, headers: HeaderMap) -> Result<Self> {
+    pub fn new(root: impl AsRef<Path>, headers: HeaderMap) -> Result<Self> {
         Ok(Self {
             root: root.as_ref().to_path_buf(),
             count: Arc::new(AtomicUsize::new(0)),
@@ -249,7 +223,7 @@ impl Downloader {
     }
 
     /// 下载普通资源
-    fn download_normal(&mut self, res: &Resource) -> CommonDownloadHandle {
+    fn download_normal(&mut self, res: &Resource) -> Box<CommonDownloadHandle> {
         let path = res.absolute_path(&self.root);
         let handle = self
             .pool
@@ -259,17 +233,17 @@ impl Downloader {
             .unwrap()
             .download(&res.url);
 
-        CommonDownloadHandle {
+        Box::new(CommonDownloadHandle {
             url: res.url.clone(),
             path,
             handle: Some(handle),
-        }
+        })
     }
 
     /// 下载 Live2D 模型
     ///
     /// resource.url 实际为 buildScript url.
-    fn download_model(&mut self, res: &Resource) -> Live2dDownloadHandle {
+    fn download_model(&mut self, res: &Resource) -> Box<Live2dDownloadHandle> {
         Live2dDownloadHandle::new(
             &res.url,
             &res.absolute_path(&self.root), // 编译器会优化掉 & + clone 吧...
@@ -285,10 +259,10 @@ impl Handle for Downloader {
     /// 等待下载任务完成并返回
     ///
     /// panic: 下载器被调用 cancel.
-    fn join(mut self) -> Self::Result {
+    fn join(mut self: Box<Self>) -> Self::Result {
         // 等待 Live2D 下载任务
         while self.count.load(Ordering::Relaxed) != 0 {
-            thread::sleep(DOWNLOAD_JOIN_CHECK_BACKOFF);
+            sleep(DOWNLOAD_JOIN_CHECK_BACKOFF);
         }
 
         // 等待常规下载任务
@@ -317,8 +291,8 @@ impl Download for Downloader {
     fn download(&mut self, res: impl AsRef<Resource>) -> Box<dyn Handle<Result = Result<()>>> {
         let res = res.as_ref();
         match res.kind {
-            ResourceType::Figure => Box::new(self.download_model(res)),
-            _ => Box::new(self.download_normal(res)),
+            ResourceType::Figure => self.download_model(res),
+            _ => self.download_normal(res),
         }
     }
 }

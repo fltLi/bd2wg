@@ -1,8 +1,8 @@
 //! Bestdori 资源下载
 
-use crate::error::*;
-use crate::models::webgal::Resource;
-use crate::traits::handle::Handle;
+use crate::{error::*, models::webgal::Resource};
+
+use super::handle::Handle;
 
 /// Bestdori 资源下载器
 ///

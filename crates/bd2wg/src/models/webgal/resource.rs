@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use strum_macros::{AsRefStr, Display, EnumString};
+use strum_macros::{AsRefStr, Display};
 
 use crate::traits::asset::Asset;
 

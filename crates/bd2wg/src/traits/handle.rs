@@ -1,15 +1,11 @@
 //! 任务句柄
 
-use std::ops::Deref;
-
-use crate::{error::*, traits::handle};
-
 /// 任务句柄
 pub trait Handle {
     type Result;
 
     /// 等待结束并获取运行结果
-    fn join(self) -> Self::Result;
+    fn join(self: Box<Self>) -> Self::Result;
 
     /// 中断执行
     ///

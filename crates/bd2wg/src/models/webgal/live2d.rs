@@ -1,7 +1,6 @@
 //! WebGAL Live2D 配置
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};

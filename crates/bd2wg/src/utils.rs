@@ -1,11 +1,8 @@
 //! 辅助工具
 
-use std::fs;
-use std::path::Path;
+use std::{fs, path::Path};
 
-use bytes::Bytes;
-use reqwest::blocking::Client;
-use reqwest::header::HeaderMap;
+use reqwest::{blocking::Client, header::HeaderMap};
 
 /// 为 Handle 实现 cancel Drop
 #[macro_export]
@@ -51,6 +48,30 @@ macro_rules! impl_deref_for_asref {
     };
 }
 
+/// 为元组型结构体实现 iter 和 into_iter
+#[macro_export]
+macro_rules! impl_iter_for_tuple {
+    ($t:ty, $inner:ty) => {
+        paste::paste! {
+            impl $t {
+                /// 枚举内部元素
+                pub fn iter(&self) -> impl Iterator<Item = &$inner> {
+                    self.0.iter()
+                }
+            }
+
+            impl IntoIterator for $t {
+                type Item = $inner;
+                type IntoIter = std::vec::IntoIter<$inner>;
+
+                fn into_iter(self) -> Self::IntoIter {
+                    self.0.into_iter()
+                }
+            }
+        }
+    };
+}
+
 /// 执行表达式, 返回 Ok(())
 #[macro_export]
 macro_rules! return_ok {
@@ -60,13 +81,35 @@ macro_rules! return_ok {
     }};
 }
 
+/// 当原子量为 true 时 panic
+#[macro_export]
+macro_rules! false_or_panic {
+    ($atom:expr) => {
+        false_or_panic! {$atom, "cancel"}
+    };
+    ($atom:expr, $text:expr) => {
+        if $atom.load(std::sync::atomic::Ordering::Relaxed) {
+            panic!($text)
+        }
+    };
+
+    ($atom:ident) => {
+        false_or_panic! {$atom, "cancel"}
+    };
+    ($atom:ident, $text:literal) => {
+        if $atom.load(std::sync::atomic::Ordering::Relaxed) {
+            panic!($text)
+        }
+    };
+}
+
 /// 从请求头快速创建 Client
 pub fn new_client_with_headers(headers: HeaderMap) -> reqwest::Result<Client> {
     Client::builder().default_headers(headers).build()
 }
 
 /// 创建完整路径, 将字节写入文件
-pub fn create_and_write<B: AsRef<[u8]>>(bytes: &B, path: &Path) -> std::io::Result<()> {
+pub fn create_and_write(bytes: impl AsRef<[u8]>, path: &Path) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }

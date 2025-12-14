@@ -6,16 +6,15 @@ use std::{collections::HashMap, sync::Arc};
 
 use derive_builder::Builder;
 
-use crate::error::*;
-use crate::models::webgal::{ChangeFigureAction, SayAction};
-use crate::models::{
-    bestdori::{self, Motion},
-    webgal::{self, FigureSide, Resource, Scene, Transform},
+use crate::{
+    error::*,
+    models::{
+        bestdori::{self, Motion},
+        webgal::{self, ChangeFigureAction, FigureSide, Resource, SayAction, Scene, Transform},
+    },
+    return_ok,
+    traits::{asset::Asset, resolve::*, transpile::*},
 };
-use crate::return_ok;
-use crate::traits::asset::Asset;
-use crate::traits::resolve::*;
-use crate::traits::transpile::*;
 
 type PreResult<T> = std::result::Result<T, TranspileErrorKind>;
 
@@ -234,7 +233,7 @@ impl<R: Resolve> Transpiler<R> {
                 model.side = (*to).into();
                 model.transform = Transform::new_with_x(*to_x);
 
-                self.try_display_motion(motion, !wait).unwrap();
+                self.display_motion_unwrap(motion, !wait);
             }},
 
             // 执行登场

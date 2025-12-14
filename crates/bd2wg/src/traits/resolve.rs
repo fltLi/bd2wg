@@ -2,9 +2,11 @@
 
 use std::{ops::Deref, sync::Arc};
 
-use crate::error::ResolveError;
-use crate::impl_deref_for_asref;
-use crate::models::{bestdori, webgal};
+use crate::{
+    error::ResolveError,
+    impl_deref_for_asref,
+    models::{bestdori, webgal},
+};
 
 pub type ResolveResult<T> = Result<T, ResolveError>;
 

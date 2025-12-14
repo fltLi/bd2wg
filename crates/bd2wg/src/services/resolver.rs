@@ -1,17 +1,22 @@
 //! 资源解析器
 
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
-use std::sync::Arc;
-
-use crate::error::*;
-use crate::models::bestdori::{
-    self, BESTDORI_ASSET_URL_MODEL, BESTDORI_ASSET_URL_MODEL_BUILDER, BESTDORI_ASSET_URL_ROOT,
-    BESTDORI_ASSET_URL_SE,
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    sync::Arc,
 };
-use crate::models::webgal;
-use crate::traits::resolve::*;
-use crate::utils::{gen_name_from_url, lower_first_alphabetic};
+
+use crate::{
+    error::*,
+    models::{
+        bestdori::{
+            self, BESTDORI_ASSET_URL_MODEL, BESTDORI_ASSET_URL_MODEL_BUILDER,
+            BESTDORI_ASSET_URL_ROOT, BESTDORI_ASSET_URL_SE,
+        },
+        webgal,
+    },
+    traits::resolve::*,
+    utils::*,
+};
 
 const RESOURCE_IMAGE_EXTEND: &str = ".png";
 const RESOURCE_SOUND_EXTEND: &str = ".mp3";

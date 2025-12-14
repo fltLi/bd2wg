@@ -2,22 +2,22 @@
 
 // TODO: 使用 crossbeam-channel 提供更优雅的管道实现.
 
-use std::collections::VecDeque;
-use std::mem;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, Sender, channel};
-use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::{
+    collections::VecDeque,
+    mem,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{Receiver, Sender, channel},
+    },
+    thread::{self, JoinHandle, sleep},
+    time::Duration,
+};
 
 use bytes::Bytes;
-use reqwest::blocking::Client;
-use reqwest::header::HeaderMap;
+use reqwest::{blocking::Client, header::HeaderMap};
 
-use crate::error::*;
-use crate::impl_drop_for_handle;
-use crate::traits::handle::Handle;
-use crate::utils::new_client_with_headers;
+use crate::{error::*, impl_drop_for_handle, traits::handle::Handle, utils::*};
 
 /// 下载池返回类型
 pub type PoolResult<T> = std::result::Result<T, DownloadErrorKind>;
@@ -53,7 +53,7 @@ impl Handle for DownloadHandle {
     /// 等待并获取下载结果
     ///
     /// panic: 下载池 / 句柄被调用 cancel.
-    fn join(self) -> Self::Result {
+    fn join(self: Box<Self>) -> Self::Result {
         self.receiver.recv().unwrap() // 下载池不应崩溃
     }
 
@@ -69,7 +69,7 @@ impl Handle for DownloadHandle {
 impl_drop_for_handle! {DownloadHandle}
 
 /// 创建下载任务, 获取命令和句柄
-fn new_download_task(url: &str) -> (DownloadCommand, DownloadHandle) {
+fn new_download_task(url: &str) -> (DownloadCommand, Box<DownloadHandle>) {
     let cancel = Arc::new(AtomicBool::new(false));
     let (sender, receiver) = channel();
 
@@ -79,7 +79,7 @@ fn new_download_task(url: &str) -> (DownloadCommand, DownloadHandle) {
             cancel: cancel.clone(),
             sender,
         },
-        DownloadHandle { cancel, receiver },
+        Box::new(DownloadHandle { cancel, receiver }),
     )
 }
 
@@ -194,7 +194,7 @@ impl DownloadPoolWorker {
         // 若连续失败次数超过阈值，尝试重启 client
         if self.count >= CLIENT_RESTART_FAILURE_THRESHOLD {
             // 等待一段时间再尝试重建 client
-            thread::sleep(CLIENT_RESTART_BACKOFF);
+            sleep(CLIENT_RESTART_BACKOFF);
             if let Ok(client) = new_client_with_headers(self.headers.clone()) {
                 self.client = client;
             }
@@ -297,15 +297,15 @@ pub struct DownloadPool {
 
 impl DownloadPool {
     /// 根据请求头启动下载池
-    pub fn new(headers: HeaderMap) -> PoolResult<Self> {
+    pub fn new(headers: HeaderMap) -> PoolResult<Box<Self>> {
         let (worker, cancel, sender) = DownloadPoolWorker::new(headers)?;
         let handle = thread::spawn(move || worker.run());
 
-        Ok(Self {
+        Ok(Box::new(Self {
             handle: Some(handle),
             cancel,
             sender,
-        })
+        }))
     }
 
     /// 创建下载任务
@@ -313,7 +313,7 @@ impl DownloadPool {
     /// 非阻塞地在子线程启动下载任务, 返回任务句柄.
     ///
     /// panic: 下载池被调用 cancel.
-    pub fn download(&mut self, url: &str) -> DownloadHandle {
+    pub fn download(&mut self, url: &str) -> Box<DownloadHandle> {
         let (cmd, handle) = new_download_task(url);
         self.sender.send(cmd).unwrap();
         handle
@@ -326,15 +326,13 @@ impl Handle for DownloadPool {
     /// 等待下载任务完成
     ///
     /// panic: 下载池被调用 cancel.
-    fn join(mut self) -> Self::Result {
+    fn join(mut self: Box<Self>) -> Self::Result {
         self.handle.take().unwrap().join().unwrap(); // 下载池不应崩溃
     }
 
     fn cancel(&mut self) {
         self.cancel.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.handle.take() {
-            handle.join().unwrap(); // 下载池不应崩溃
-        }
+        self.handle = None;
     }
 
     /// 询问下载任务是否均已完成

@@ -1,10 +1,6 @@
 //! Bestdori Live2D 配置
 
-use std::str::FromStr;
-
 use serde::{Deserialize, Serialize};
-
-use crate::error::*;
 
 use super::*;
 
@@ -51,7 +47,7 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
+    pub fn from_slice(bytes: &[u8]) -> serde_json::Result<Self> {
         let helper: ModelHelper = serde_json::from_slice(bytes)?;
         Ok(helper.into())
     }

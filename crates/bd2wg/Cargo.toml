@@ -16,6 +16,5 @@ strum_macros.workspace = true
 serde.workspace = true
 serde_with.workspace = true
 serde_json.workspace = true
-crossbeam-channel = "*"
 bytes = "1"
 reqwest = { version = "*", features = ["blocking"] }

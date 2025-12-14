@@ -1,13 +1,15 @@
 //! WebGAL 脚本指令
 
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    ops::Deref,
+};
 
 use derive_builder::Builder;
 use serde::Serialize;
 use webgal_derive::{ActionCustom, Actionable};
 
 use crate::impl_display_for_serde;
-use crate::models::bestdori::LayoutSideType;
 
 /// WebGAL 命令
 pub struct Action(pub Box<dyn Actionable + Send + Sync + 'static>);
@@ -16,6 +18,18 @@ impl Display for Action {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
+}
+
+/// 渲染指令迭代器
+pub fn display_action_iter<I, A>(iter: I, f: &mut fmt::Formatter<'_>) -> fmt::Result
+where
+    I: Iterator<Item = A>,
+    A: Deref<Target = Action>,
+{
+    for action in iter {
+        writeln!(f, "{}", action.deref())?;
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, Default)]

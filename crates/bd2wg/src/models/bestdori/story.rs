@@ -1,10 +1,8 @@
 //! Bestdori 故事脚本
 
-use std::str::FromStr;
+use serde::Deserialize;
 
-use serde::{Deserialize, Serialize};
-
-use crate::error::*;
+use crate::impl_iter_for_tuple;
 
 use super::*;
 
@@ -13,17 +11,18 @@ use super::*;
 /// 请使用 Self::from_slice 方法经由中间结构体反序列化.
 pub struct Story(pub Vec<Action>);
 
+impl_iter_for_tuple! {Story, Action}
+
 impl Story {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> serde_json::Result<Self> {
         let helper: StoryHelper = serde_json::from_slice(bytes)?;
         Ok(helper.into())
     }
 
     /// 迭代, 每次提供下一项的 wait
     pub fn iter_with_wait(&self) -> impl Iterator<Item = (&Action, bool)> {
-        self.0.iter().zip(
-            self.0
-                .iter()
+        self.iter().zip(
+            self.iter()
                 .map(|a| a.is_wait())
                 .skip(1)
                 .chain(std::iter::once(false)),
