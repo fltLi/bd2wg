@@ -1,0 +1,27 @@
+[package]
+name = "bd2wg"
+version = "1.0.0"
+author.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+webgal-derive = { path = "../webgal-derive" }
+webgal-derive-macro = { path = "../webgal-derive-macro" }
+paste.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+derive_builder.workspace = true
+strum.workspace = true
+strum_macros.workspace = true
+serde.workspace = true
+serde_with.workspace = true
+serde_json.workspace = true
+bytes.workspace = true
+brotli2 = "0.3"
+zstd = "0.13"
+reqwest = { version = "0.12", features = ["blocking", "gzip", "brotli", "deflate"] }
+
+[features]
+# 包含默认请求头支持并将 assets/header.json 复制到构建输出目录
+default_header = []
