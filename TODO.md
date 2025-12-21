@@ -20,4 +20,4 @@
 
 5. [x] 实现命令行界面 bd2wg-cli.
 
-6. [ ] 重写 README.md, 并在 docs/ 下编写文档. 
+6. [x] 重写 README.md, 并在 docs/ 下编写文档. 
