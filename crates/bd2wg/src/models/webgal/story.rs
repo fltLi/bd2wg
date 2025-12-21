@@ -1,6 +1,9 @@
 //! WebGAL 故事脚本
 
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    path::{Path, PathBuf},
+};
 
 use crate::{impl_iter_for_tuple, models::webgal::display_action_iter, traits::asset::Asset};
 
@@ -52,6 +55,10 @@ impl Scene {
 
 impl Asset for Scene {
     fn relative_path(&self) -> String {
-        format!("scene/{}", self.path)
+        self.path.clone()
+    }
+
+    fn absolute_path(&self, root: impl AsRef<Path>) -> PathBuf {
+        root.as_ref().join(format!("scene/{}", self.path))
     }
 }

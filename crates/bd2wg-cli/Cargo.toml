@@ -8,4 +8,4 @@ license.workspace = true
 [dependencies]
 bd2wg = { path = "../bd2wg", features = ["default_header"] }
 anyhow.workspace = true
-indicatif = "*"
+indicatif = "0.18"

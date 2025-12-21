@@ -17,8 +17,10 @@ strum_macros.workspace = true
 serde.workspace = true
 serde_with.workspace = true
 serde_json.workspace = true
-bytes = "1"
-reqwest = { version = "*", features = ["blocking"] }
+bytes.workspace = true
+brotli2 = "0.3"
+zstd = "0.13"
+reqwest = { version = "0.12", features = ["blocking", "gzip", "brotli", "deflate"] }
 
 [features]
 # 包含默认请求头支持并将 assets/header.json 复制到构建输出目录

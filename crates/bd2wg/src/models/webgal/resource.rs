@@ -26,21 +26,15 @@ pub struct Resource {
     pub path: String,
 }
 
-impl Resource {
-    fn default_relative_path(&self) -> String {
-        format!("{}/{}", self.kind, self.path)
-    }
-}
-
 impl Asset for Resource {
     fn relative_path(&self) -> String {
         match self.kind {
-            ResourceType::Figure => super::default_model_config_path(&self.default_relative_path()),
-            _ => self.default_relative_path(),
+            ResourceType::Figure => super::default_model_config_path(&self.path),
+            _ => self.path.clone(),
         }
     }
 
     fn absolute_path(&self, root: impl AsRef<Path>) -> PathBuf {
-        root.as_ref().join(self.default_relative_path())
+        root.as_ref().join(format!("{}/{}", self.kind, self.path))
     }
 }

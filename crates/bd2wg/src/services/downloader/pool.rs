@@ -216,13 +216,27 @@ impl DownloadPoolWorker {
     }
 
     /// 处理成功返回的 Response
-    fn handle_response_ok(&mut self, task: DownloadTask, resp: reqwest::blocking::Response) {
-        // 将非 2xx 的 HTTP 状态视为请求错误, 交由请求错误分支处理并重试
+    fn handle_response_ok(&mut self, mut task: DownloadTask, resp: reqwest::blocking::Response) {
         match resp.error_for_status() {
-            Ok(resp) => match resp.bytes() {
-                Ok(bytes) => self.handle_success(task, bytes),
-                Err(e) => self.handle_body_error(task, e),
-            },
+            Ok(resp) => {
+                // 检查 Content-Encoding, 在 reqwest 未自动解压的情况下提供回退解码
+                let encoding = resp
+                    .headers()
+                    .get(reqwest::header::CONTENT_ENCODING)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_lowercase();
+
+                match resp.bytes() {
+                    Ok(bytes) => match maybe_decompress_bytes(&bytes, &encoding) {
+                        Ok(out) => self.handle_success(task, Bytes::from(out)),
+                        Err(e) => task.send(Err(DownloadErrorKind::Io(e))),
+                    },
+                    Err(e) => self.handle_body_error(task, e),
+                }
+            }
+
+            // 将非 2xx 的 HTTP 状态视为请求错误, 交由请求错误分支处理并重试
             Err(e) => self.handle_request_error(task, e),
         }
     }
@@ -318,6 +332,9 @@ impl DownloadPool {
     ///
     /// panic: 下载池被调用 cancel.
     pub fn download(&mut self, url: &str) -> Box<DownloadHandle> {
+        #[cfg(debug_assertions)]
+        dbg!(url);
+
         let (cmd, handle) = new_download_task(url);
         self.sender.send(cmd).unwrap();
         handle

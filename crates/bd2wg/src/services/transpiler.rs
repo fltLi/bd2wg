@@ -138,7 +138,7 @@ impl<R: Resolve> Transpiler<R> {
     /// 识别并记录新资源
     ///
     /// 始终在上下文使用完资源后调用以记录
-    fn try_push_resource(&mut self, res: ResourceEntry) {
+    fn maybe_push_resource(&mut self, res: ResourceEntry) {
         if let ResourceEntry::Vacant(v) = res {
             self.resources.push(v);
         }
@@ -261,9 +261,9 @@ impl<R: Resolve> Transpiler<R> {
             bestdori::LayoutType::Appear => return_ok! {{
                 let res = self.resolver.resolve_model(model);
 
-                self.display_motion(model, motion, !wait);
+                self.display_motion(&res.relative_path(), (*to).into(), motion, !wait);
 
-                self.try_push_resource(res);
+                self.maybe_push_resource(res);
             }},
         }
     }
@@ -274,9 +274,9 @@ impl<R: Resolve> Transpiler<R> {
         let res = self.resolver.resolve_model(model);
 
         // 执行模型动作
-        self.display_motion(&res.relative_path(), motion, !wait);
+        self.display_motion(&res.relative_path(), FigureSide::default(), motion, !wait);
 
-        self.try_push_resource(res);
+        self.maybe_push_resource(res);
     }
 
     // ---------------- transpile ----------------
@@ -292,7 +292,7 @@ impl<R: Resolve> Transpiler<R> {
             .into(),
         );
 
-        self.try_push_resource(res);
+        self.maybe_push_resource(res);
 
         Ok(())
     }
@@ -308,7 +308,7 @@ impl<R: Resolve> Transpiler<R> {
             .into(),
         );
 
-        self.try_push_resource(res);
+        self.maybe_push_resource(res);
 
         Ok(())
     }
@@ -355,7 +355,7 @@ impl<R: Resolve> Transpiler<R> {
             .into(),
         );
 
-        self.try_push_resource(res);
+        self.maybe_push_resource(res);
 
         Ok(())
     }
@@ -379,7 +379,7 @@ impl<R: Resolve> Transpiler<R> {
         // 恢复场景
         self.set_context(ctx);
 
-        self.try_push_resource(res);
+        self.maybe_push_resource(res);
 
         Ok(())
     }
@@ -430,17 +430,18 @@ impl<R: Resolve> Transpiler<R> {
     }
 
     /// 修改模型动作 (不存在时插入模型)
-    fn display_motion(&mut self, model: &str, motion: &Motion, next: bool) {
+    fn display_motion(&mut self, model: &str, side: FigureSide, motion: &Motion, next: bool) {
         if let Entry::Vacant(v) = self.context.models.entry(motion.character) {
             v.insert(
                 ModelBuilder::default()
                     .path(model.to_string())
+                    .side(side)
                     .build()
                     .unwrap(),
             );
         }
 
-        let _ = self.try_display_motion(motion, next);
+        self.display_motion_unwrap(motion, next);
     }
 
     /// 移除模型

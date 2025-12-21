@@ -6,7 +6,7 @@ use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_with::{Map, serde_as};
 
-use crate::models::bestdori;
+use crate::{models::bestdori, utils::maybe_strip_suffix};
 
 /// WebGAL Live2D 版本
 pub const WEBGAL_LIVE2D_VERSION: &str = "Sample 1.0.0";
@@ -49,7 +49,10 @@ impl Model {
         );
 
         // 模型和物理采用默认路径
-        res.push((model.model.url(), WEBGAL_LIVE2D_MODEL.into()));
+        res.push((
+            maybe_strip_suffix(&model.model.url(), ".bytes").to_string(),
+            WEBGAL_LIVE2D_MODEL.into(),
+        ));
         res.push((model.physics.url(), WEBGAL_LIVE2D_PHYSICS.into()));
 
         // 解析纹理, 动作和表情
@@ -71,10 +74,14 @@ impl Model {
                     .motions
                     .iter()
                     .map(|url| {
-                        let file = url.file.strip_suffix(".mtn.bytes").unwrap_or(&url.file);
+                        let file =
+                            maybe_strip_suffix(maybe_strip_suffix(&url.file, ".bytes"), ".mtn");
                         let path = format!("{WEBGAL_LIVE2D_MOTIONS}{file}.mtn");
 
-                        res.push((url.url(), PathBuf::from(&path)));
+                        res.push((
+                            maybe_strip_suffix(&url.url(), ".bytes").to_string(),
+                            PathBuf::from(&path),
+                        ));
                         (file.to_string(), vec![path.to_string().into()])
                     })
                     .collect(),
@@ -84,7 +91,7 @@ impl Model {
                     .expressions
                     .iter()
                     .map(|url| {
-                        let file = url.file.strip_suffix(".exp.json").unwrap_or(&url.file);
+                        let file = maybe_strip_suffix(&url.file, ".exp.json");
                         let path = format!("{WEBGAL_LIVE2D_EXPRESSIONS}{}", url.file);
 
                         res.push((url.url(), PathBuf::from(&path)));

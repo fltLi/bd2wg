@@ -1,12 +1,18 @@
 //! 辅助工具
 
-use std::{fs, path::Path};
+use std::{
+    fs,
+    io::{Cursor, Read},
+    path::Path,
+};
 
+use brotli2::read::BrotliDecoder;
 use reqwest::{
     blocking::Client,
     header::{HeaderMap, HeaderName, HeaderValue},
 };
 use serde_json::Value;
+use zstd::stream::read::Decoder as ZstdDecoder;
 
 // /// 默认请求头路径
 // pub const DEFAULT_HEADER_PATH: &str = "./assets/header.json";
@@ -124,6 +130,13 @@ pub fn create_and_write(bytes: impl AsRef<[u8]>, path: &Path) -> std::io::Result
     Ok(())
 }
 
+/// 尝试移除后缀
+///
+/// 改为泛型是 unstable, 因此固定 suffix 为 &str
+pub fn maybe_strip_suffix<'a>(s: &'a str, suffix: &str) -> &'a str {
+    s.strip_suffix(suffix).unwrap_or(s)
+}
+
 /// 从 url 生成唯一路径
 pub fn gen_name_from_url(url: &str, extend: &str) -> String {
     url.chars()
@@ -147,6 +160,29 @@ pub fn lower_first_alphabetic(s: &str) -> String {
             c
         })
         .collect()
+}
+
+/// 根据 `Content-Encoding` 尝试解压字节流 (作为回退解码)
+pub fn maybe_decompress_bytes(bytes: &[u8], encoding: &str) -> std::io::Result<Vec<u8>> {
+    let enc = encoding.to_lowercase();
+
+    if enc.contains("zstd") {
+        let cursor = Cursor::new(bytes);
+        let mut dec = ZstdDecoder::new(cursor)?;
+        let mut out = Vec::new();
+        dec.read_to_end(&mut out)?;
+
+        Ok(out)
+    } else if enc.contains("br") || enc.contains("brotli") {
+        let cursor = Cursor::new(bytes);
+        let mut dec = BrotliDecoder::new(cursor);
+        let mut out = Vec::new();
+        dec.read_to_end(&mut out)?;
+
+        Ok(out)
+    } else {
+        Ok(bytes.to_vec())
+    }
 }
 
 /// 从 json 构建 HeaderMap
