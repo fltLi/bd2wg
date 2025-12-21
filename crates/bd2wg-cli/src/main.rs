@@ -31,6 +31,7 @@ fn run() {
     // 转译
 
     println!("transpiling...");
+    flush! {};
 
     let pipe = TranspilePipeline::new(story, outdir, default_header().unwrap());
 
@@ -47,6 +48,7 @@ fn run() {
     try_show_errors(errors);
 
     println!();
+    flush! {};
 
     // 下载
 
@@ -54,11 +56,13 @@ fn run() {
         Ok(v) => v,
         Err(e) => {
             println!("failed to start download, error:\n{e}");
+            flush! {};
             return;
         }
     };
 
     println!("downloading...");
+    flush! {};
 
     // 初始化 indicatif 进度条
     let pb = ProgressBar::new(0);
@@ -99,7 +103,10 @@ fn run() {
 }
 
 fn main() {
-    println!("bd2wg-cli\n{GIT_REPOSITORY}\n");
+    println!("bd2wg-cli\n{GIT_REPOSITORY}");
+    flush! {};
 
-    run();
+    loop {
+        run();
+    }
 }

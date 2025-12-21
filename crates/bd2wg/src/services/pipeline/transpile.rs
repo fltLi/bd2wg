@@ -31,56 +31,6 @@ use crate::{
 
 use super::DownloadPipeline;
 
-/// 执行转译管线
-fn run_pipeline(
-    story: &Path, // Bestdori 脚本路径
-    root: &Path,
-    cancel: Arc<AtomicBool>,
-    state: Arc<RwLock<TranspileState>>,
-) -> (Vec<Error>, Vec<Arc<Resource>>) {
-    macro_rules! unwrap_or_into_vec {
-        ($expr:expr) => {
-            match $expr {
-                Ok(v) => v,
-                Err(e) => return (vec![Error::File(e.into())], Vec::new()),
-            }
-        };
-    }
-
-    // 读取故事脚本
-    let story = unwrap_or_into_vec! {
-        bestdori::Story::from_bytes(
-            &unwrap_or_into_vec! {fs::read(story)},
-        )
-    };
-
-    false_or_panic! {cancel}
-
-    // 执行转译
-    let transpile::TranspileResult {
-        story,
-        resources,
-        mut errors,
-    } = Transpiler::<Resolver>::default().transpile(&story);
-
-    false_or_panic! {cancel}
-
-    let (scene, action) = story.len();
-    state.set(TranspileState { scene, action }).unwrap();
-
-    // 逐个写入场景
-    for scene in story.iter() {
-        false_or_panic! {cancel}
-
-        if let Err(e) = create_and_write(scene.to_string(), &scene.absolute_path(root)) {
-            errors.push(Error::File(e.into()));
-        }
-    }
-
-    cancel.store(true, Ordering::Relaxed);
-    (errors, resources)
-}
-
 /// 转译管线
 pub struct TranspilePipeline {
     cancel: Arc<AtomicBool>,
@@ -110,11 +60,64 @@ impl TranspilePipeline {
             let story = story.as_ref().to_path_buf();
             let root = root.as_ref().to_path_buf();
 
-            thread::spawn(move || run_pipeline(&story, &root, cancel, state))
+            thread::spawn(move || Self::run(&story, &root, cancel, state))
         });
 
         // Self { handle: ..., ..pipe }
         pipe
+    }
+
+    /// 执行转译管线
+    fn run(
+        story: &Path, // Bestdori 脚本路径
+        root: &Path,
+        cancel: Arc<AtomicBool>,
+        state: Arc<RwLock<TranspileState>>,
+    ) -> (Vec<Error>, Vec<Arc<Resource>>) {
+        macro_rules! unwrap_or_into_vec {
+            ($expr:expr) => {
+                match $expr {
+                    Ok(v) => v,
+                    Err(e) => return (vec![Error::File(e.into())], Vec::new()),
+                }
+            };
+        }
+
+        // 读取故事脚本
+        let story = unwrap_or_into_vec! {
+            bestdori::Story::from_bytes(
+                &unwrap_or_into_vec! {fs::read(story)},
+            )
+        };
+
+        false_or_panic! {cancel}
+
+        // 执行转译
+        let transpile::TranspileResult {
+            story,
+            resources,
+            mut errors,
+        } = Transpiler::<Resolver>::default().transpile(&story);
+
+        false_or_panic! {cancel}
+
+        {
+            let (scene, action) = story.len();
+            let mut state = state.write().unwrap();
+            (state.scene, state.action) = (scene, action);
+        }
+
+        // 逐个写入场景
+        for scene in story.iter() {
+            false_or_panic! {cancel}
+
+            if let Err(e) = create_and_write(scene.to_string(), &scene.absolute_path(root)) {
+                errors.push(Error::File(e.into()));
+            }
+        }
+
+        cancel.store(true, Ordering::Relaxed);
+        (errors, resources)
     }
 }
 
@@ -125,8 +128,8 @@ impl Handle for TranspilePipeline {
     ///
     /// panic: 转译管线被调用 cancel.
     fn join(mut self: Box<Self>) -> Self::Result {
-        let state = self.state.get_cloned().unwrap();
         let (errors, res) = self.handle.take().unwrap().join().unwrap();
+        let state = self.state.read().unwrap().clone();
 
         (
             TranspileResult { state, errors },

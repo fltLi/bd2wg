@@ -215,7 +215,7 @@ impl Resolve for Resolver {
                 url: format!(
                     "{BESTDORI_ASSET_URL_MODEL}{costume}_rip/{BESTDORI_ASSET_URL_MODEL_BUILDER}"
                 ),
-                path: costume.to_string(),
+                path: format!("{costume}/"),
             })
         })
         .unwrap() // :(

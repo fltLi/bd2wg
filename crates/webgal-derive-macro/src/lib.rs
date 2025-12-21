@@ -92,10 +92,10 @@ fn parse_struct_attrs(attrs: &[Attribute]) -> StructAttrs {
                         if let Lit::Str(lit) = nv.lit {
                             head = Some(lit.value());
                         }
-                    } else if nv.path.is_ident("main")
-                        && let Lit::Str(lit) = nv.lit
-                    {
-                        main = Some(lit.value());
+                    } else if nv.path.is_ident("main") {
+                        if let Lit::Str(lit) = nv.lit {
+                            main = Some(lit.value());
+                        }
                     }
                 }
                 Meta::Path(path) if path.is_ident("custom") => {
@@ -155,18 +155,18 @@ fn parse_field_attrs(field: syn::Field) -> FieldInfo {
                     }
                 }
                 Meta::NameValue(nv) => {
-                    if nv.path.is_ident("arg")
-                        && let Lit::Str(lit) = nv.lit
-                    {
-                        arg = Some(lit.value());
-                    } else if nv.path.is_ident("rename")
-                        && let Lit::Str(lit) = nv.lit
-                    {
-                        rename = Some(lit.value());
-                    } else if nv.path.is_ident("tie")
-                        && let Lit::Str(lit) = nv.lit
-                    {
-                        tie = Some(lit.value());
+                    if nv.path.is_ident("arg") {
+                        if let Lit::Str(lit) = nv.lit {
+                            arg = Some(lit.value());
+                        }
+                    } else if nv.path.is_ident("rename") {
+                        if let Lit::Str(lit) = nv.lit {
+                            rename = Some(lit.value());
+                        }
+                    } else if nv.path.is_ident("tie") {
+                        if let Lit::Str(lit) = nv.lit {
+                            tie = Some(lit.value());
+                        }
                     }
                 }
                 _ => {}

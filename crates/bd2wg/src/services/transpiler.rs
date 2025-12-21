@@ -2,7 +2,10 @@
 
 // TODO: 处理 delay 字段.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    sync::Arc,
+};
 
 use derive_builder::Builder;
 
@@ -22,9 +25,13 @@ type PreResult<T> = std::result::Result<T, TranspileErrorKind>;
 #[derive(Debug, Clone, Default, Builder)]
 struct Model {
     path: String,
+    #[builder(default)]
     side: FigureSide,
+    #[builder(default)]
     transform: Transform,
+    #[builder(default)]
     motion: Option<String>,
+    #[builder(default)]
     expression: Option<String>,
 }
 
@@ -47,12 +54,21 @@ pub struct Transpiler<R: Resolve> {
 
 impl<R: Resolve> Transpiler<R> {
     pub fn new(resolver: R) -> Self {
-        Self {
+        let mut transpiler = Self {
             resolver,
             context: Context::default(),
             scenes: vec![Scene::new_start_scene()],
             resources: Vec::new(),
-        }
+        };
+
+        transpiler.push_action_and_change_scene(
+            webgal::CallSceneAction {
+                file: transpiler.next_scene_name(),
+            }
+            .into(),
+        );
+
+        transpiler
     }
 
     fn into_result(self, errors: Vec<Error>) -> TranspileResult {
@@ -114,6 +130,11 @@ impl<R: Resolve> Transpiler<R> {
         self.scenes.last_mut().unwrap().actions.push(action);
     }
 
+    fn push_action_and_change_scene(&mut self, action: webgal::Action) {
+        self.push_action(action);
+        self.scenes.push(Scene::new(&self.next_scene_name()));
+    }
+
     /// 识别并记录新资源
     ///
     /// 始终在上下文使用完资源后调用以记录
@@ -166,7 +187,7 @@ impl<R: Resolve> Transpiler<R> {
         self.push_action(
             SayAction {
                 name: name.clone(),
-                text: text.clone(),
+                text: text.trim().to_string(),
                 next: !wait,
                 character: characters.first().cloned(),
             }
@@ -308,17 +329,13 @@ impl<R: Resolve> Transpiler<R> {
 
     /// 呈现字幕 (通过切换场景实现)
     fn display_telop(&mut self, text: &str) {
-        let scene = self.next_scene_name();
-
-        self.push_action(
+        self.push_action_and_change_scene(
             webgal::ChooseAction {
-                file: scene.clone(),
+                file: self.next_scene_name(),
                 text: text.to_string(),
             }
             .into(),
         );
-
-        self.scenes.push(Scene::new(&scene));
     }
 
     /// 修改背景
@@ -414,13 +431,14 @@ impl<R: Resolve> Transpiler<R> {
 
     /// 修改模型动作 (不存在时插入模型)
     fn display_motion(&mut self, model: &str, motion: &Motion, next: bool) {
-        let _ = self.context.models.try_insert(
-            motion.character,
-            ModelBuilder::default()
-                .path(model.to_string())
-                .build()
-                .unwrap(),
-        );
+        if let Entry::Vacant(v) = self.context.models.entry(motion.character) {
+            v.insert(
+                ModelBuilder::default()
+                    .path(model.to_string())
+                    .build()
+                    .unwrap(),
+            );
+        }
 
         let _ = self.try_display_motion(motion, next);
     }

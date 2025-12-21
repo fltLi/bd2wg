@@ -42,14 +42,12 @@ impl From<StoryHelper> for Story {
         let StoryHelper {
             bgm,
             background,
-            actions,
+            mut actions,
         } = val;
-
-        let mut story = Vec::with_capacity(actions.len() + 2);
 
         // 推入初始 bgm, background
         if let Some(res) = bgm {
-            story.push(Action::Sound(SoundAction {
+            actions.push(Action::Sound(SoundAction {
                 wait: false,
                 delay: 0.,
                 bgm: Some(res),
@@ -58,13 +56,13 @@ impl From<StoryHelper> for Story {
         }
 
         if let Some(res) = background {
-            story.push(Action::Effect(EffectAction {
+            actions.push(Action::Effect(EffectAction {
                 wait: false,
                 delay: 0.,
                 effect: Effect::ChangeBackground { image: res },
             }));
         }
 
-        Self(story)
+        Self(actions)
     }
 }

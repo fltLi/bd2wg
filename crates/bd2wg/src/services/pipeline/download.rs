@@ -27,59 +27,6 @@ use crate::{
 /// 下载状态更新间隔
 const DOWNLOAD_STATE_UPDATE_BACKOFF: Duration = Duration::from_millis(100);
 
-/// 执行下载管线
-fn run_pipeline(
-    mut downloader: Downloader,
-    resources: Vec<Arc<Resource>>,
-    cancel: Arc<AtomicBool>,
-    state: Arc<RwLock<DownloadState>>,
-) -> Vec<Error> {
-    let mut errors = Vec::new();
-
-    // 启动下载任务
-    let mut handles: Vec<_> = resources
-        .into_iter()
-        .map(|res| downloader.download(res))
-        .collect();
-
-    // 状态检查
-    let mut check = || -> bool {
-        if handles.is_empty() {
-            return false;
-        }
-
-        // 检查已完成的任务
-        let done: Vec<_> = handles
-            .iter()
-            .enumerate()
-            .filter_map(|(k, task)| if task.is_finished() { Some(k) } else { None })
-            .collect();
-
-        // 更新计数
-        state.write().unwrap().done += done.len();
-
-        // 清理任务
-        for k in done.into_iter().rev() {
-            let task = handles.swap_remove(k);
-            if let Err(e) = task.join() {
-                errors.push(e);
-            }
-        }
-
-        true
-    };
-
-    // 监听循环
-    while !check() {
-        false_or_panic! {cancel}
-
-        sleep(DOWNLOAD_STATE_UPDATE_BACKOFF);
-    }
-
-    cancel.store(true, Ordering::Relaxed);
-    errors
-}
-
 /// 下载管线
 pub struct DownloadPipeline {
     cancel: Arc<AtomicBool>,
@@ -109,10 +56,64 @@ impl DownloadPipeline {
         });
 
         pipe.handle = Some(thread::spawn(move || {
-            run_pipeline(downloader, res, cancel, state)
+            Self::run(downloader, res, cancel, state)
         }));
 
         Ok(pipe)
+    }
+
+    /// 执行下载管线
+    fn run(
+        mut downloader: Downloader,
+        resources: Vec<Arc<Resource>>,
+        cancel: Arc<AtomicBool>,
+        state: Arc<RwLock<DownloadState>>,
+    ) -> Vec<Error> {
+        let mut errors = Vec::new();
+
+        // 启动下载任务
+        let mut handles: Vec<_> = resources
+            .into_iter()
+            .map(|res| downloader.download(res))
+            .collect();
+
+        // 状态检查
+        let mut check = || -> bool {
+            if handles.is_empty() {
+                return false;
+            }
+
+            // 检查已完成的任务
+            let done: Vec<_> = handles
+                .iter()
+                .enumerate()
+                .filter_map(|(k, task)| if task.is_finished() { Some(k) } else { None })
+                .collect();
+
+            // 更新计数
+            state.write().unwrap().done += done.len();
+
+            // 清理任务
+            for k in done.into_iter().rev() {
+                let task = handles.swap_remove(k);
+                if let Err(e) = task.join() {
+                    errors.push(e);
+                }
+            }
+
+            true
+        };
+
+        // 监听循环
+        // while !check() {  // 耻辱柱!
+        while check() {
+            false_or_panic! {cancel}
+
+            sleep(DOWNLOAD_STATE_UPDATE_BACKOFF);
+        }
+
+        cancel.store(true, Ordering::Relaxed);
+        errors
     }
 }
 
@@ -123,7 +124,7 @@ impl Handle for DownloadPipeline {
     ///
     /// panic: 下载管线被调用 cancel.
     fn join(mut self: Box<Self>) -> Self::Result {
-        let state = self.state.get_cloned().unwrap();
+        let state = self.state.read().unwrap().clone();
         let errors = self.handle.take().unwrap().join().unwrap();
 
         DownloadResult { state, errors }

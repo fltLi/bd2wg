@@ -27,6 +27,7 @@ pub fn default_model_config_path(root: &str) -> String {
 /// WebGAL Live2D 配置文件
 #[serde_as]
 #[derive(Debug, Clone, Builder, Deserialize, Serialize)]
+#[builder(default)]
 pub struct Model {
     pub version: String,
     pub layout: Layout,
@@ -44,7 +45,7 @@ impl Model {
     /// 解析 Bestdori Live2D BuildScript, 获取配置和资源 (url / relative path)
     pub fn from_bestdori_model(model: bestdori::Model) -> (Self, Vec<(String, PathBuf)>) {
         let mut res = Vec::with_capacity(
-            1 + model.textures.len() + model.motions.len() + model.expessions.len(),
+            1 + model.textures.len() + model.motions.len() + model.expressions.len(),
         );
 
         // 模型和物理采用默认路径
@@ -58,7 +59,7 @@ impl Model {
                     .textures
                     .iter()
                     .map(|url| {
-                        let path = format!("{WEBGAL_LIVE2D_TEXTURES}{}", url.path());
+                        let path = format!("{WEBGAL_LIVE2D_TEXTURES}{}", url.file);
 
                         res.push((url.url(), PathBuf::from(&path)));
                         path
@@ -74,13 +75,13 @@ impl Model {
                         let path = format!("{WEBGAL_LIVE2D_MOTIONS}{file}.mtn");
 
                         res.push((url.url(), PathBuf::from(&path)));
-                        (file.to_string(), vec![file.to_string().into()])
+                        (file.to_string(), vec![path.to_string().into()])
                     })
                     .collect(),
             )
             .expressions(
                 model
-                    .expessions
+                    .expressions
                     .iter()
                     .map(|url| {
                         let file = url.file.strip_suffix(".exp.json").unwrap_or(&url.file);
@@ -117,6 +118,7 @@ impl Default for Model {
 }
 
 #[derive(Debug, Clone, Builder, Deserialize, Serialize)]
+#[builder(default)]
 pub struct Layout {
     #[serde(rename = "center_x")]
     pub x: i16,
@@ -136,6 +138,7 @@ impl Default for Layout {
 }
 
 #[derive(Debug, Clone, Builder, Deserialize, Serialize)]
+#[builder(default)]
 pub struct HitAreas {
     pub head_x: (f32, f32),
     pub head_y: (f32, f32),

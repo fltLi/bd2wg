@@ -8,8 +8,8 @@ use reqwest::{
 };
 use serde_json::Value;
 
-/// 默认请求头路径
-pub const DEFAULT_HEADER_PATH: &str = "./assets/header.json";
+// /// 默认请求头路径
+// pub const DEFAULT_HEADER_PATH: &str = "./assets/header.json";
 
 /// 为 Handle 实现 cancel Drop
 #[macro_export]
@@ -179,7 +179,12 @@ pub fn new_header_from_bytes(bytes: &[u8]) -> anyhow::Result<HeaderMap> {
     new_header_from_json(&serde_json::from_slice(bytes)?)
 }
 
+/// 默认请求头文件
+#[cfg(feature = "default_header")]
+const HEADER_JSON: &[u8] = include_bytes!("../assets/header.json");
+
 /// 解析默认请求头
+#[cfg(feature = "default_header")]
 pub fn default_header() -> anyhow::Result<HeaderMap> {
-    new_header_from_bytes(&fs::read(DEFAULT_HEADER_PATH)?)
+    new_header_from_bytes(HEADER_JSON)
 }

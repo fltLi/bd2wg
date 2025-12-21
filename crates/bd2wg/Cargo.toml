@@ -19,3 +19,7 @@ serde_with.workspace = true
 serde_json.workspace = true
 bytes = "1"
 reqwest = { version = "*", features = ["blocking"] }
+
+[features]
+# 包含默认请求头支持并将 assets/header.json 复制到构建输出目录
+default_header = []

@@ -122,6 +122,7 @@ impl ActionCustom for SetTextboxAction {
 
 /// 切换立绘
 #[derive(Debug, Clone, Default, Builder, Actionable)]
+#[builder(default)]
 #[action(head = "changeFigure", main = "single", custom)]
 pub struct ChangeFigureAction {
     #[action(main, nullable, none)]

@@ -2,11 +2,7 @@
 
 use std::fmt::{self, Display};
 
-use crate::{
-    impl_iter_for_tuple,
-    models::webgal::{CallSceneAction, display_action_iter},
-    traits::asset::Asset,
-};
+use crate::{impl_iter_for_tuple, models::webgal::display_action_iter, traits::asset::Asset};
 
 use super::Action;
 
@@ -50,15 +46,7 @@ impl Scene {
 
     /// 生成初始场景
     pub fn new_start_scene() -> Self {
-        Self {
-            path: START_SCENE_PATH.to_string(),
-            actions: vec![
-                CallSceneAction {
-                    file: START_SCENE_PATH.to_string(),
-                }
-                .into(),
-            ],
-        }
+        Self::new(START_SCENE_PATH)
     }
 }
 

@@ -119,6 +119,7 @@ impl Live2dDownloadWorker {
         let resource = handle
             .join()
             .map_err(download_error)
+            // 解析 Bestdori Live2D 配置文件
             .and_then(|model| {
                 bestdori::Model::from_slice(&model).map_err(|e| download_error(e.into()))
             })
@@ -131,8 +132,12 @@ impl Live2dDownloadWorker {
                     &serde_json::to_vec_pretty(&model).map_err(|e| download_error(e.into()))?,
                     Path::new(&default_model_config_path(&self.path.to_string_lossy())),
                 )
-                .map_err(|e| download_error(e.into()))
-                .map(|_| res)
+                .map_err(|e| download_error(e.into()))?;
+
+                // 合成完整路径
+                Ok(res
+                    .into_iter()
+                    .map(|(url, path)| (url, self.path.join(path))))
             })?;
 
         // 下载相关资源

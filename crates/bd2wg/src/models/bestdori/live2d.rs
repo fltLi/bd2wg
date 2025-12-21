@@ -43,7 +43,7 @@ pub struct Model {
     pub physics: Live2dPath,
     pub textures: Vec<Live2dPath>,
     pub motions: Vec<Live2dPath>,
-    pub expessions: Vec<Live2dPath>,
+    pub expressions: Vec<Live2dPath>,
 }
 
 impl Model {

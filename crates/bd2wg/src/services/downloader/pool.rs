@@ -217,9 +217,13 @@ impl DownloadPoolWorker {
 
     /// 处理成功返回的 Response
     fn handle_response_ok(&mut self, task: DownloadTask, resp: reqwest::blocking::Response) {
-        match resp.bytes() {
-            Ok(bytes) => self.handle_success(task, bytes),
-            Err(e) => self.handle_body_error(task, e),
+        // 将非 2xx 的 HTTP 状态视为请求错误, 交由请求错误分支处理并重试
+        match resp.error_for_status() {
+            Ok(resp) => match resp.bytes() {
+                Ok(bytes) => self.handle_success(task, bytes),
+                Err(e) => self.handle_body_error(task, e),
+            },
+            Err(e) => self.handle_request_error(task, e),
         }
     }
 
