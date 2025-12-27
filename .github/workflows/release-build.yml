@@ -1,0 +1,100 @@
+name: Build release binaries
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            platform: macos-x86_64
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            platform: windows-x86_64
+            target: x86_64-pc-windows-msvc
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version (bash)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          VERSION=$(awk -F'"' '/^[[:space:]]*version[[:space:]]*=/{print $2; exit}' Cargo.toml)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Get version (PowerShell)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $s = Get-Content Cargo.toml -Raw
+          if ($s -match 'version\s*=\s*"([^"]+)"') { Add-Content -Path $env:GITHUB_ENV -Value ("VERSION=$($matches[1])") }
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+
+      - name: Build bd2wg-cli
+        run: cargo build --release --target ${{ matrix.target }}
+        working-directory: crates/bd2wg-cli
+
+      - name: Strip binary (linux and macos)
+        if: matrix.platform == 'linux-x86_64' || matrix.platform == 'macos-x86_64'
+        run: |
+          strip "target/${{ matrix.target }}/release/bd2wg-cli" || true
+
+      - name: Prepare package (bash)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          rm -rf bd2wg-cli || true
+          mkdir -p bd2wg-cli/docs
+          mkdir -p bd2wg-cli/assets
+          cp -r docs/* bd2wg-cli/docs/ || true
+          cp -r assets/* bd2wg-cli/assets/ || true
+          cp README.md LICENSE bd2wg-cli/ || true
+          BIN=target/${{ matrix.target }}/release/bd2wg-cli
+          cp "$BIN" bd2wg-cli/bd2wg-cli
+          zip -r "bd2wg-cli-${VERSION}-${{ matrix.platform }}.zip" bd2wg-cli
+
+      - name: Prepare package (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $dir = "bd2wg-cli"
+          Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path "$dir\docs" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$dir\assets" | Out-Null
+          Copy-Item -Path docs\* -Destination "$dir\docs\" -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path assets\* -Destination "$dir\assets\" -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path README.md, LICENSE -Destination "$dir\" -Force -ErrorAction SilentlyContinue
+          $bin = "target\${{ matrix.target }}\release\bd2wg-cli.exe"
+          Copy-Item -Path $bin -Destination "$dir\bd2wg-cli.exe" -Force
+          $zip = "bd2wg-cli-$env:VERSION-${{ matrix.platform }}.zip"
+          Compress-Archive -Path $dir -DestinationPath $zip -Force
+
+      - name: Upload asset to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: bd2wg-cli-${{ env.VERSION }}-${{ matrix.platform }}.zip
+          asset_name: bd2wg-cli-${{ env.VERSION }}-${{ matrix.platform }}.zip
+          asset_content_type: application/zip

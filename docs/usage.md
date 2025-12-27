@@ -8,10 +8,6 @@
 
 选择对应平台的包, 解压, 使用时直接运行 `bd2wg-cli.exe` 即可.
 
-> [!NOTE]
-> 
-> bd2wg-cli 当前缺少在 Linux, macOS 等平台的构建. 若您愿意, 欢迎贡献 CI/CD 配置.
-
 ## 使用
 
 ![使用截图](../assets/usage-example.png)
