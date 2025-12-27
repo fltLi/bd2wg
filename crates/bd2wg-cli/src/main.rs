@@ -68,35 +68,41 @@ fn run() {
     let pb = ProgressBar::new(0);
     pb.set_style(
         ProgressStyle::default_bar()
-            .template(
-                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}",
-            )
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")
             .unwrap()
             .progress_chars("#>-"),
     );
 
     // 等待下载完成
     while !pipe.is_finished() {
-        let DownloadState { done, total } = pipe.state();
+        let DownloadState {
+            success,
+            failed,
+            total,
+        } = pipe.state();
 
         // 使用进度条呈现 done / total
         pb.set_length(total as u64);
-        pb.set_position(done as u64);
+        pb.set_position((success + failed) as u64);
 
         sleep(STATE_UPDATE_BACKOFF);
     }
 
     let DownloadResult {
-        state: DownloadState { total, done },
+        state: DownloadState {
+            success,
+            failed,
+            total,
+        },
         errors,
     } = pipe.join();
 
     pb.set_length(total as u64);
-    pb.set_position(done as u64);
+    pb.set_position((success + failed) as u64);
     pb.finish();
 
     println!("download completed, result: ");
-    print!("{} success, ", total - errors.len());
+    print!("{} success, ", success);
     try_show_errors(errors);
 
     pause! {};

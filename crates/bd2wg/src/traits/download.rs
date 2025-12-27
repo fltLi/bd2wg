@@ -1,6 +1,6 @@
 //! Bestdori 资源下载
 
-use crate::{error::*, models::webgal::Resource};
+use crate::{error::Error, models::webgal::Resource};
 
 use super::handle::Handle;
 
@@ -14,5 +14,8 @@ use super::handle::Handle;
 /// 建议下载器内部管理基础下载任务池, 接受每个任务句柄的调用.
 pub trait Download: Handle<Result = ()> {
     /// 启动下载任务
-    fn download(&mut self, res: impl AsRef<Resource>) -> Box<dyn Handle<Result = Result<()>>>;
+    fn download(
+        &mut self,
+        res: impl AsRef<Resource>,
+    ) -> Box<dyn Handle<Result = Result<(), Vec<Error>>>>;
 }

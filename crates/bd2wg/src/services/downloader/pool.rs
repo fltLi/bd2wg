@@ -2,6 +2,8 @@
 
 // TODO: 使用 crossbeam-channel 提供更优雅的管道实现.
 
+// TODO: 使用 unstable mpmc 同时启动多个 DownloadPoolWorker.
+
 use std::{
     collections::VecDeque,
     mem,
@@ -10,29 +12,39 @@ use std::{
         atomic::{AtomicBool, Ordering},
         mpsc::{Receiver, Sender, channel},
     },
-    thread::{self, JoinHandle, sleep},
+    thread::{JoinHandle, sleep, spawn},
     time::Duration,
 };
 
 use bytes::Bytes;
-use reqwest::{blocking::Client, header::HeaderMap};
+use crossbeam_channel::{Receiver as MultiReceiver, Sender as MultiSender, unbounded};
+use reqwest::{
+    blocking::{Client, Response},
+    header::HeaderMap,
+};
 
 use crate::{error::*, impl_drop_for_handle, traits::handle::Handle, utils::*};
 
 /// 下载池返回类型
 pub type PoolResult<T> = std::result::Result<T, DownloadErrorKind>;
 
+/// 下载器工作线程计数
+const CLIENT_COUNT: usize = 4;
+
 /// 单个下载任务时间限制
-const DOWNLOAD_TASK_TIMEOUT: Duration = Duration::from_secs(16);
+const TASK_TIMEOUT: Duration = Duration::from_secs(16);
 
 /// 单个下载任务最大重试次数
-const DOWNLOAD_TASK_MAX_RETRIES: usize = 3;
+const TASK_MAX_RETRIES: usize = 3;
 
 /// 客户端重启所需的连续失败次数
 const CLIENT_RESTART_FAILURE_THRESHOLD: usize = 5;
 
 /// 客户端重启等待时间
 const CLIENT_RESTART_BACKOFF: Duration = Duration::from_secs(8);
+
+/// 客户端连续重启在全部失败情况下的次数限制
+const CLIENT_RESTART_LIMIT: usize = 3;
 
 /// 下载命令
 struct DownloadCommand {
@@ -125,33 +137,35 @@ impl Drop for DownloadTask {
 /// 详细说明参考 run() 方法注释.
 struct DownloadPoolWorker {
     count: usize,
-    header: HeaderMap, // 保存请求头以支持重新创建 Client
+    restart_count: usize,           // 连续全失败重启计数
+    successes_since_restart: usize, // 自上次重启以来成功的任务数
+
+    header: Arc<HeaderMap>, // 保存请求头以支持重新创建 Client
     client: Client,
     cancel: Arc<AtomicBool>,
-    receiver: Receiver<DownloadCommand>,
+    receiver: MultiReceiver<DownloadCommand>,
     tasks: VecDeque<DownloadTask>,
 }
 
 impl DownloadPoolWorker {
     /// 创建 (但不运行) 下载池内部管理
-    fn new(header: HeaderMap) -> PoolResult<(Self, Arc<AtomicBool>, Sender<DownloadCommand>)> {
-        let client = new_client_with_header(header.clone())?;
+    fn new(
+        header: Arc<HeaderMap>,
+        cancel: Arc<AtomicBool>,
+        receiver: MultiReceiver<DownloadCommand>,
+    ) -> PoolResult<Self> {
+        let client = new_client_with_header((*header).clone())?;
 
-        let cancel = Arc::new(AtomicBool::new(false));
-        let (sender, receiver) = channel();
-
-        Ok((
-            Self {
-                count: 0,
-                header,
-                client,
-                cancel: cancel.clone(),
-                receiver,
-                tasks: VecDeque::new(),
-            },
-            cancel,
-            sender,
-        ))
+        Ok(Self {
+            count: 0,
+            restart_count: 0,
+            successes_since_restart: 0,
+            header,
+            client,
+            cancel: cancel.clone(),
+            receiver,
+            tasks: VecDeque::new(),
+        })
     }
 
     /// 退出全部下载任务
@@ -162,10 +176,10 @@ impl DownloadPoolWorker {
     /// 接收并启动一些下载任务
     fn receive(&mut self) {
         if !self.tasks.is_empty() {
-            // 有任务时, 非阻塞加入当前全部任务
-            self.receiver.try_iter().for_each(|cmd| {
+            // 有任务时, 非阻塞获取并加入一个任务
+            if let Ok(cmd) = self.receiver.try_recv() {
                 self.tasks.push_back(DownloadTask::new(cmd));
-            });
+            }
         } else if let Ok(cmd) = self.receiver.recv() {
             // 没有任务时, 阻塞等待下一个任务
             // 当 Sender 丢弃时, 忽略错误, run() 将进入下一轮开头的退出检查分支
@@ -182,20 +196,25 @@ impl DownloadPoolWorker {
             return;
         }
         // 尝试下载 (阻塞)
-        let res = self
-            .client
-            .get(&task.url)
-            .timeout(DOWNLOAD_TASK_TIMEOUT)
-            .send();
+        let res = self.client.get(&task.url).timeout(TASK_TIMEOUT).send();
 
         // 处理响应
         self.handle_response(task, res);
 
-        // 若连续失败次数超过阈值，尝试重启 client
+        // 若连续失败次数超过阈值, 尝试重启 client
         if self.count >= CLIENT_RESTART_FAILURE_THRESHOLD {
+            // 根据自上次重启以来是否有成功, 更新连续全失败重启计数
+            if self.successes_since_restart == 0 {
+                self.restart_count = self.restart_count.saturating_add(1);
+            } else {
+                self.restart_count = 0;
+            }
+            // 重启后清零成功计数, 准备记录下一轮
+            self.successes_since_restart = 0;
+
             // 等待一段时间再尝试重建 client
             sleep(CLIENT_RESTART_BACKOFF);
-            if let Ok(client) = new_client_with_header(self.header.clone()) {
+            if let Ok(client) = new_client_with_header((*self.header).clone()) {
                 self.client = client;
             }
             // 清空连续失败计数
@@ -207,7 +226,7 @@ impl DownloadPoolWorker {
     fn handle_response(
         &mut self,
         task: DownloadTask,
-        res: std::result::Result<reqwest::blocking::Response, reqwest::Error>,
+        res: std::result::Result<Response, reqwest::Error>,
     ) {
         match res {
             Ok(resp) => self.handle_response_ok(task, resp),
@@ -244,6 +263,8 @@ impl DownloadPoolWorker {
     /// 请求成功且读取 body 成功
     fn handle_success(&mut self, mut task: DownloadTask, bytes: Bytes) {
         self.count = 0;
+        self.restart_count = 0;
+        self.successes_since_restart = self.successes_since_restart.saturating_add(1);
         task.send(Ok(bytes));
     }
 
@@ -261,7 +282,7 @@ impl DownloadPoolWorker {
     fn increment_failure_and_maybe_retry(&mut self, mut task: DownloadTask, err: reqwest::Error) {
         task.count += 1;
         self.count += 1;
-        if task.count >= DOWNLOAD_TASK_MAX_RETRIES {
+        if task.count >= TASK_MAX_RETRIES || self.restart_count >= CLIENT_RESTART_LIMIT {
             task.send(Err(DownloadErrorKind::Reqwest(err)));
         } else {
             self.tasks.push_back(task);
@@ -280,7 +301,7 @@ impl DownloadPoolWorker {
     /// 1. 下载任务超时 / 出错时, 先推入队尾重新尝试.
     /// 2. 单个任务多次失败, 该任务结束并返回最后一次错误信息.
     /// 3. 连续多个任务失败, 将在一段时间后启动新的 client, 并清空任务的错误计数.  
-    ///    考虑到场景的简单性, 以及为了保证线程的有效性, 多次重启失败仍将**继续执行下载**.
+    ///    连续多次重启失败 / 没有任务成功将清空队列中的任务.
     fn run(mut self) {
         loop {
             // 检查退出
@@ -308,19 +329,29 @@ impl DownloadPoolWorker {
 /// 下载任务超时时推入队尾稍后重试, 多次重试报错.
 #[derive(Debug)]
 pub struct DownloadPool {
-    handle: Option<JoinHandle<()>>,
     cancel: Arc<AtomicBool>,
-    sender: Sender<DownloadCommand>,
+    sender: MultiSender<DownloadCommand>,
+    handles: Vec<JoinHandle<()>>,
 }
 
 impl DownloadPool {
     /// 根据请求头启动下载池
     pub fn new(header: HeaderMap) -> PoolResult<Box<Self>> {
-        let (worker, cancel, sender) = DownloadPoolWorker::new(header)?;
-        let handle = thread::spawn(move || worker.run());
+        let header = Arc::new(header);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let (sender, receiver) = unbounded();
+
+        // 同时启动多个工作线程
+        let handles = (0..CLIENT_COUNT)
+            .map(|_| {
+                let worker =
+                    DownloadPoolWorker::new(header.clone(), cancel.clone(), receiver.clone())?;
+                Ok(spawn(move || worker.run()))
+            })
+            .collect::<PoolResult<_>>()?;
 
         Ok(Box::new(Self {
-            handle: Some(handle),
+            handles,
             cancel,
             sender,
         }))
@@ -348,19 +379,19 @@ impl Handle for DownloadPool {
     ///
     /// panic: 下载池被调用 cancel.
     fn join(mut self: Box<Self>) -> Self::Result {
-        self.handle.take().unwrap().join().unwrap(); // 下载池不应崩溃
+        for handle in mem::take(&mut self.handles) {
+            handle.join().unwrap(); // 下载池不应崩溃
+        }
     }
 
     fn cancel(&mut self) {
         self.cancel.store(true, Ordering::Relaxed);
-        self.handle = None;
+        self.handles.clear();
     }
 
     /// 询问下载任务是否均已完成
     fn is_finished(&self) -> bool {
-        self.handle
-            .as_ref()
-            .is_none_or(|handle| handle.is_finished())
+        self.handles.iter().any(|handle| handle.is_finished())
     }
 }
 

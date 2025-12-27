@@ -90,16 +90,25 @@ impl DownloadPipeline {
                 .filter_map(|(k, task)| if task.is_finished() { Some(k) } else { None })
                 .collect();
 
-            // 更新计数
-            state.write().unwrap().done += done.len();
+            let mut success = 0;
+            let mut failed = 0;
 
             // 清理任务
             for k in done.into_iter().rev() {
                 let task = handles.swap_remove(k);
-                if let Err(e) = task.join() {
-                    errors.push(e);
+
+                match task.join() {
+                    Ok(_) => success += 1,
+                    Err(mut e) => {
+                        failed += 1;
+                        errors.append(&mut e);
+                    }
                 }
             }
+
+            // 更新计数
+            state.write().unwrap().success += success;
+            state.write().unwrap().failed += failed;
 
             true
         };

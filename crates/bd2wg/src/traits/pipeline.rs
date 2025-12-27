@@ -21,7 +21,8 @@ pub struct TranspileResult {
 /// 下载状态
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DownloadState {
-    pub done: usize,
+    pub success: usize,
+    pub failed: usize,
     pub total: usize,
 }
 

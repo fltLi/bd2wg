@@ -25,6 +25,8 @@ use crate::{
 
 use super::pool::{DownloadHandle, DownloadPool};
 
+type DownloadResult = std::result::Result<(), Vec<Error>>;
+
 /// Downloader join(): Live2d 任务结束状态检查间隔时间
 const DOWNLOAD_JOIN_CHECK_BACKOFF: Duration = Duration::from_secs(1);
 
@@ -36,7 +38,7 @@ struct CommonDownloadHandle {
 }
 
 impl Handle for CommonDownloadHandle {
-    type Result = Result<()>;
+    type Result = DownloadResult;
 
     /// 等待下载任务完成
     ///
@@ -48,11 +50,11 @@ impl Handle for CommonDownloadHandle {
             .join()
             .and_then(|bytes| create_and_write(&bytes, &self.path).map_err(DownloadErrorKind::Io))
             .map_err(|e| {
-                Error::Download(DownloadError {
+                vec![Error::Download(DownloadError {
                     url: self.url.clone(),
                     path: self.path.clone(),
                     error: e,
-                })
+                })]
             })
     }
 
@@ -104,7 +106,7 @@ impl Live2dDownloadWorker {
     }
 
     /// (阻塞) 执行主循环
-    fn run(self) -> Result<()> {
+    fn run(self) -> DownloadResult {
         // 生成下载错误
         let download_error = |error| {
             Error::Download(DownloadError {
@@ -138,20 +140,36 @@ impl Live2dDownloadWorker {
                 Ok(res
                     .into_iter()
                     .map(|(url, path)| (url, self.path.join(path))))
-            })?;
+            })
+            .map_err(|e| vec![e])?;
 
-        // 下载相关资源
-        for (url, path) in resource {
-            false_or_panic! {self.cancel}
+        // 启动下载
+        let handles = resource
+            .into_iter()
+            .map(|(url, path)| (self.pool.lock().unwrap().download(&url), path));
 
-            // 下载资源
-            let handle = self.pool.lock().unwrap().download(&url);
-            handle.join().map_err(download_error).and_then(|bytes| {
-                create_and_write(&bytes, &path).map_err(|err| download_error(err.into()))
-            })?;
+        // 等待并处理下载结果
+        let errors: Vec<_> = handles
+            .into_iter()
+            .filter_map(|(handle, path)| {
+                false_or_panic! {self.cancel}
+
+                handle
+                    .join()
+                    .map_err(download_error)
+                    .and_then(|bytes| {
+                        // 写入本地文件
+                        create_and_write(&bytes, &path).map_err(|err| download_error(err.into()))
+                    })
+                    .err() // 保留失败错误
+            })
+            .collect();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
         }
-
-        Ok(())
     }
 }
 
@@ -166,7 +184,7 @@ impl Drop for Live2dDownloadWorker {
 /// Live2D 下载任务句柄
 struct Live2dDownloadHandle {
     cancel: Arc<AtomicBool>,
-    handle: Option<JoinHandle<Result<()>>>,
+    handle: Option<JoinHandle<DownloadResult>>,
 }
 
 impl Live2dDownloadHandle {
@@ -188,7 +206,7 @@ impl Live2dDownloadHandle {
 }
 
 impl Handle for Live2dDownloadHandle {
-    type Result = Result<()>;
+    type Result = DownloadResult;
 
     fn join(mut self: Box<Self>) -> Self::Result {
         self.handle.take().unwrap().join().unwrap()
@@ -293,7 +311,10 @@ impl Handle for Downloader {
 }
 
 impl Download for Downloader {
-    fn download(&mut self, res: impl AsRef<Resource>) -> Box<dyn Handle<Result = Result<()>>> {
+    fn download(
+        &mut self,
+        res: impl AsRef<Resource>,
+    ) -> Box<dyn Handle<Result = std::result::Result<(), Vec<Error>>>> {
         let res = res.as_ref();
         match res.kind {
             ResourceType::Figure => self.download_model(res),

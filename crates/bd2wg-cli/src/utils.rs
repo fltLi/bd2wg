@@ -18,7 +18,7 @@ macro_rules! readln {
         std::io::stdin()
             .lines()
             .next()
-            .expect("输入已结束")
+            .expect("no input.")
             .unwrap()
     };
 
