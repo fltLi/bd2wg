@@ -2,8 +2,6 @@
 
 // TODO: 使用 crossbeam-channel 提供更优雅的管道实现.
 
-// TODO: 使用 unstable mpmc 同时启动多个 DownloadPoolWorker.
-
 use std::{
     collections::VecDeque,
     mem,
@@ -32,7 +30,7 @@ pub type PoolResult<T> = std::result::Result<T, DownloadErrorKind>;
 const CLIENT_COUNT: usize = 4;
 
 /// 单个下载任务时间限制
-const TASK_TIMEOUT: Duration = Duration::from_secs(16);
+const TASK_TIMEOUT: Duration = Duration::from_secs(24);
 
 /// 单个下载任务最大重试次数
 const TASK_MAX_RETRIES: usize = 3;
@@ -196,7 +194,8 @@ impl DownloadPoolWorker {
             return;
         }
         // 尝试下载 (阻塞)
-        let res = self.client.get(&task.url).timeout(TASK_TIMEOUT).send();
+        let timeout = TASK_TIMEOUT.mul_f32((1 << (self.restart_count + task.count)) as f32); // 分段重试
+        let res = self.client.get(&task.url).timeout(timeout).send();
 
         // 处理响应
         self.handle_response(task, res);
@@ -235,22 +234,34 @@ impl DownloadPoolWorker {
     }
 
     /// 处理成功返回的 Response
-    fn handle_response_ok(&mut self, mut task: DownloadTask, resp: reqwest::blocking::Response) {
+    fn handle_response_ok(
+        &mut self,
+        #[allow(unused_mut)] mut task: DownloadTask,
+        resp: reqwest::blocking::Response,
+    ) {
         match resp.error_for_status() {
             Ok(resp) => {
-                // 检查 Content-Encoding, 在 reqwest 未自动解压的情况下提供回退解码
-                let encoding = resp
-                    .headers()
-                    .get(reqwest::header::CONTENT_ENCODING)
-                    .and_then(|v| v.to_str().ok())
-                    .unwrap_or("")
-                    .to_lowercase();
-
                 match resp.bytes() {
-                    Ok(bytes) => match maybe_decompress_bytes(&bytes, &encoding) {
-                        Ok(out) => self.handle_success(task, Bytes::from(out)),
-                        Err(e) => task.send(Err(DownloadErrorKind::Io(e))),
-                    },
+                    Ok(bytes) => {
+                        #[cfg(feature = "wider_compression")]
+                        {
+                            // 检查 Content-Encoding, 在 reqwest 未自动解压的情况下提供回退解码
+                            let encoding = resp
+                                .headers()
+                                .get(reqwest::header::CONTENT_ENCODING)
+                                .and_then(|v| v.to_str().ok())
+                                .unwrap_or("")
+                                .to_lowercase();
+
+                            match maybe_decompress_bytes(&bytes, &encoding) {
+                                Ok(out) => self.handle_success(task, Bytes::from(out)),
+                                Err(e) => task.send(Err(DownloadErrorKind::Io(e))),
+                            }
+                        }
+
+                        #[cfg(not(feature = "wider_compression"))]
+                        self.handle_success(task, bytes);
+                    }
                     Err(e) => self.handle_body_error(task, e),
                 }
             }

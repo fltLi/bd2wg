@@ -1,18 +1,12 @@
 //! 辅助工具
 
-use std::{
-    fs,
-    io::{Cursor, Read},
-    path::Path,
-};
+use std::{fs, path::Path};
 
-use brotli2::read::BrotliDecoder;
 use reqwest::{
     blocking::Client,
     header::{HeaderMap, HeaderName, HeaderValue},
 };
 use serde_json::Value;
-use zstd::stream::read::Decoder as ZstdDecoder;
 
 // /// 默认请求头路径
 // pub const DEFAULT_HEADER_PATH: &str = "./assets/header.json";
@@ -118,7 +112,17 @@ macro_rules! false_or_panic {
 
 /// 从请求头快速创建 Client
 pub fn new_client_with_header(header: HeaderMap) -> reqwest::Result<Client> {
-    Client::builder().default_headers(header).build()
+    #[cfg(feature = "wider_compression")]
+    {
+        Client::builder().default_headers(header).build()
+    }
+
+    #[cfg(not(feature = "wider_compression"))]
+    {
+        let mut defaults = header;
+        defaults.remove(reqwest::header::ACCEPT_ENCODING);
+        Client::builder().default_headers(defaults).build()
+    }
 }
 
 /// 创建完整路径, 将字节写入文件
@@ -163,7 +167,13 @@ pub fn lower_first_alphabetic(s: &str) -> String {
 }
 
 /// 根据 `Content-Encoding` 尝试解压字节流 (作为回退解码)
+#[cfg(feature = "wider_compression")]
 pub fn maybe_decompress_bytes(bytes: &[u8], encoding: &str) -> std::io::Result<Vec<u8>> {
+    use std::io::{Cursor, Read};
+
+    use brotli2::read::BrotliDecoder;
+    use zstd::stream::read::Decoder as ZstdDecoder;
+
     let enc = encoding.to_lowercase();
 
     if enc.contains("zstd") {
