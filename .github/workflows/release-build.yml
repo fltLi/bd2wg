@@ -1,8 +1,18 @@
-name: Build release binaries
+name: release build
 
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag/Version to build (defaults to Cargo.toml version)'
+        required: false
+        default: ''
+      build_all:
+        description: 'Build all architectures'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -13,6 +23,7 @@ jobs:
     strategy:
       matrix:
         include:
+          # x86_64 架构
           - os: ubuntu-latest
             platform: linux-x86_64
             target: x86_64-unknown-linux-gnu
@@ -22,41 +33,90 @@ jobs:
           - os: windows-latest
             platform: windows-x86_64
             target: x86_64-pc-windows-msvc
+          # ARM 架构
+          - os: macos-latest
+            platform: macos-aarch64
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            platform: windows-aarch64
+            target: aarch64-pc-windows-msvc
       fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 确定版本号
       - name: Get version (bash)
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          VERSION=$(awk -F'"' '/^[[:space:]]*version[[:space:]]*=/{print $2; exit}' Cargo.toml)
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            # 使用手动输入的版本号
+            VERSION="${{ github.event.inputs.tag_name }}"
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            # 使用 release 的 tag 名
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            # 从 Cargo.toml 读取版本号
+            VERSION=$(awk -F'"' '/^[[:space:]]*version[[:space:]]*=/{print $2; exit}' Cargo.toml)
+          fi
+          # 移除可能的前缀 'v'
+          VERSION="${VERSION#v}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Building version: $VERSION"
 
       - name: Get version (PowerShell)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $s = Get-Content Cargo.toml -Raw
-          if ($s -match 'version\s*=\s*"([^"]+)"') { Add-Content -Path $env:GITHUB_ENV -Value ("VERSION=$($matches[1])") }
+          $version = ""
+          # 优先使用手动输入的版本号
+          if ('${{ github.event.inputs.tag_name }}' -ne '') {
+            $version = '${{ github.event.inputs.tag_name }}'
+          } 
+          # 其次使用 release tag
+          elseif ('${{ github.event.release.tag_name }}' -ne '') {
+            $version = '${{ github.event.release.tag_name }}'
+          }
+          # 最后从 Cargo.toml 读取
+          if ([string]::IsNullOrEmpty($version)) {
+            $s = Get-Content Cargo.toml -Raw
+            if ($s -match 'version\s*=\s*"([^"]+)"') { 
+              $version = $matches[1]
+            }
+          }
+          # 移除可能的前缀 'v'
+          $version = $version -replace '^v', ''
+          Add-Content -Path $env:GITHUB_ENV -Value ("VERSION=$version")
+          Write-Host "Building version: $version"
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          profile: minimal
-          override: true
-          target: ${{ matrix.target }}
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation toolchain (macOS ARM)
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: |
+          rustup target add aarch64-apple-darwin
 
       - name: Build bd2wg-cli
-        run: cargo build --release --target ${{ matrix.target }}
+        shell: bash
+        run: |
+          cargo build --release --target ${{ matrix.target }}
         working-directory: crates/bd2wg-cli
 
       - name: Strip binary (linux and macos)
-        if: matrix.platform == 'linux-x86_64' || matrix.platform == 'macos-x86_64'
+        if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
-          strip "target/${{ matrix.target }}/release/bd2wg-cli" || true
+          # 对于交叉编译的二进制, 先确保有 strip 工具
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            which aarch64-linux-gnu-strip && aarch64-linux-gnu-strip "target/${{ matrix.target }}/release/bd2wg-cli" || true
+          else
+            strip "target/${{ matrix.target }}/release/bd2wg-cli" || true
+          fi
 
       - name: Prepare package (bash)
         if: matrix.os != 'windows-latest'
@@ -69,9 +129,19 @@ jobs:
           cp -r docs/* bd2wg-cli/docs/ || true
           cp -r assets/* bd2wg-cli/assets/ || true
           cp README.md LICENSE bd2wg-cli/ || true
-          BIN=target/${{ matrix.target }}/release/bd2wg-cli
-          cp "$BIN" bd2wg-cli/bd2wg-cli
+          
+          # 确定二进制文件名
+          BIN_NAME="bd2wg-cli"
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            BIN_NAME="$BIN_NAME"
+          fi
+          
+          BIN="target/${{ matrix.target }}/release/$BIN_NAME"
+          cp "$BIN" "bd2wg-cli/$BIN_NAME"
+          
+          # 压缩打包
           zip -r "bd2wg-cli-${VERSION}-${{ matrix.platform }}.zip" bd2wg-cli
+          echo "Created: bd2wg-cli-${VERSION}-${{ matrix.platform }}.zip"
 
       - name: Prepare package (Windows)
         if: matrix.os == 'windows-latest'
@@ -88,8 +158,10 @@ jobs:
           Copy-Item -Path $bin -Destination "$dir\bd2wg-cli.exe" -Force
           $zip = "bd2wg-cli-$env:VERSION-${{ matrix.platform }}.zip"
           Compress-Archive -Path $dir -DestinationPath $zip -Force
+          Write-Host "Created: $zip"
 
-      - name: Upload asset to Release
+      - name: Upload asset to Release (if triggered by release)
+        if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -98,3 +170,12 @@ jobs:
           asset_path: bd2wg-cli-${{ env.VERSION }}-${{ matrix.platform }}.zip
           asset_name: bd2wg-cli-${{ env.VERSION }}-${{ matrix.platform }}.zip
           asset_content_type: application/zip
+
+      # 手动触发时, 将构建产物保存为工作流 artifact
+      - name: Upload artifact (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bd2wg-cli-${{ env.VERSION }}-${{ matrix.platform }}
+          path: bd2wg-cli-${{ env.VERSION }}-${{ matrix.platform }}.zip
+          retention-days: 7
