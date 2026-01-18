@@ -7,8 +7,6 @@ use std::{
     sync::Arc,
 };
 
-use derive_builder::Builder;
-
 use crate::{
     error::*,
     models::{
@@ -22,24 +20,88 @@ use crate::{
 type PreResult<T> = std::result::Result<T, TranspileErrorKind>;
 
 /// 模型上下文信息
-#[derive(Debug, Clone, Default, Builder)]
-struct Model {
+#[derive(Debug)]
+struct Model<R: ModelDisplayResolve> {
     path: String,
-    #[builder(default)]
     side: FigureSide,
-    #[builder(default)]
     transform: Transform,
-    #[builder(default)]
     motion: Option<String>,
-    #[builder(default)]
     expression: Option<String>,
+    resolver: Option<Arc<R>>,
+}
+
+impl<R: ModelDisplayResolve> Model<R> {
+    fn resolve_motion(&self, motion: &str) -> PreResult<String> {
+        match &self.resolver {
+            Some(rsv) => rsv.resolve_motion(motion).map_err(TranspileErrorKind::from),
+            None => Ok(motion.to_string()),
+        }
+    }
+
+    fn resolve_expression(&self, expression: &str) -> PreResult<String> {
+        match &self.resolver {
+            Some(rsv) => rsv
+                .resolve_expression(expression)
+                .map_err(TranspileErrorKind::from),
+            None => Ok(expression.to_string()),
+        }
+    }
+
+    fn get_motion(&self) -> PreResult<Option<String>> {
+        self.motion
+            .as_ref()
+            .map(|motion| self.resolve_motion(motion))
+            .transpose()
+    }
+
+    fn get_expression(&self) -> PreResult<Option<String>> {
+        self.expression
+            .as_ref()
+            .map(|expression| self.resolve_expression(expression))
+            .transpose()
+    }
+}
+
+impl<R: ModelDisplayResolve> Clone for Model<R> {
+    fn clone(&self) -> Self {
+        Model {
+            path: self.path.clone(),
+            side: self.side,
+            transform: self.transform.clone(),
+            motion: self.motion.clone(),
+            expression: self.expression.clone(),
+            resolver: self.resolver.clone(),
+        }
+    }
+}
+
+impl<R: ModelDisplayResolve> Default for Model<R> {
+    fn default() -> Self {
+        Self {
+            path: String::default(),
+            side: FigureSide::default(),
+            transform: Transform::default(),
+            motion: None,
+            expression: None,
+            resolver: None,
+        }
+    }
 }
 
 /// 上下文信息
-#[derive(Debug, Default)]
-struct Context {
+#[derive(Debug)]
+struct Context<R: ModelDisplayResolve> {
     background: Option<String>,
-    models: HashMap<u8, Model>,
+    models: HashMap<u8, Model<R>>,
+}
+
+impl<R: ModelDisplayResolve> Default for Context<R> {
+    fn default() -> Self {
+        Self {
+            background: None,
+            models: HashMap::default(),
+        }
+    }
 }
 
 /// 脚本转译器
@@ -47,7 +109,7 @@ struct Context {
 /// 若希望复用 Resolver, 考虑使用 Arc 包装一个实现.
 pub struct Transpiler<R: Resolve> {
     resolver: R,
-    context: Context,
+    context: Context<R::ModelDisplayResolver>,
     scenes: Vec<Scene>,
     resources: Vec<Arc<Resource>>,
 }
@@ -80,7 +142,7 @@ impl<R: Resolve> Transpiler<R> {
     }
 
     /// 清空场景
-    fn clear(&mut self) -> Context {
+    fn clear(&mut self) -> Context<R::ModelDisplayResolver> {
         // 移除人物
         let actions: Vec<webgal::Action> = self
             .context
@@ -99,13 +161,14 @@ impl<R: Resolve> Transpiler<R> {
     }
 
     /// 设置上下文
-    fn set_context(&mut self, context: Context) {
+    fn set_context(&mut self, context: Context<R::ModelDisplayResolver>) {
         // 清空场景 (场景大概为空)
         self.clear();
 
         // 设置人物
         for (&id, model) in &context.models {
-            self.display_model(id, model.clone(), true);
+            // // 模型动作 / 表情错误在其被首次调用时就已经抛出过了, 故此处忽略以避免重复错误过多.
+            let _ = self.display_model(id, model.clone(), true);
         }
 
         // 设置背景
@@ -155,7 +218,7 @@ impl<R: Resolve> Transpiler<R> {
             Action::Sound(a) => self.transpile_sound(a),
             Action::Effect(a) => self.transpile_effect(a, wait),
             Action::Layout(a) => self.transpile_layout(a, wait),
-            Action::Motion(a) => return_ok! {self.transpile_motion(a, wait)},
+            Action::Motion(a) => self.transpile_motion(a, wait),
             Action::Unknown => Err(TranspileErrorKind::Unknown),
         }
         .map_err(|e| {
@@ -244,7 +307,7 @@ impl<R: Resolve> Transpiler<R> {
             bestdori::LayoutType::Hide => self.remove_model(motion.character, !wait),
 
             // 执行移动
-            bestdori::LayoutType::Move => return_ok! {{
+            bestdori::LayoutType::Move => {
                 let model = self
                     .context
                     .models
@@ -254,29 +317,39 @@ impl<R: Resolve> Transpiler<R> {
                 model.side = (*to).into();
                 model.transform = Transform::new_with_x(*to_x);
 
-                self.display_motion_unwrap(motion, !wait);
-            }},
+                self.display_motion_unwrap(motion, !wait)
+            }
 
             // 执行登场
-            bestdori::LayoutType::Appear => return_ok! {{
-                let res = self.resolver.resolve_model(model);
+            bestdori::LayoutType::Appear => {
+                let (res, resolver) = self.resolver.resolve_model(model);
 
-                self.display_motion(&res.relative_path(), (*to).into(), motion, !wait);
+                self.display_motion(&res.relative_path(), (*to).into(), motion, !wait, resolver)?;
 
                 self.maybe_push_resource(res);
-            }},
+
+                Ok(())
+            }
         }
     }
 
-    fn transpile_motion(&mut self, action: &bestdori::MotionAction, wait: bool) {
+    fn transpile_motion(&mut self, action: &bestdori::MotionAction, wait: bool) -> PreResult<()> {
         let bestdori::MotionAction { model, motion, .. } = action;
 
-        let res = self.resolver.resolve_model(model);
+        let (res, resolver) = self.resolver.resolve_model(model);
 
         // 执行模型动作
-        self.display_motion(&res.relative_path(), FigureSide::default(), motion, !wait);
+        self.display_motion(
+            &res.relative_path(),
+            FigureSide::default(),
+            motion,
+            !wait,
+            resolver,
+        )?;
 
         self.maybe_push_resource(res);
+
+        Ok(())
     }
 
     // ---------------- transpile ----------------
@@ -387,7 +460,15 @@ impl<R: Resolve> Transpiler<R> {
     /// 执行模型动作
     ///
     /// 若采用 model: &Model, 仍需要对每个字段 clone, 故直接移动 (调用者 clone).
-    fn display_model(&mut self, id: u8, model: Model, next: bool) {
+    fn display_model(
+        &mut self,
+        id: u8,
+        model: Model<R::ModelDisplayResolver>,
+        next: bool,
+    ) -> PreResult<()> {
+        let motion = model.get_motion()?;
+        let expression = model.get_expression()?;
+
         self.push_action(
             ChangeFigureAction {
                 model: Some(model.path),
@@ -395,11 +476,13 @@ impl<R: Resolve> Transpiler<R> {
                 next,
                 side: model.side,
                 transform: Some(model.transform),
-                motion: model.motion,
-                expression: model.expression,
+                motion,
+                expression,
             }
             .into(),
         );
+
+        Ok(())
     }
 
     /// 修改模型动作 (当模型存在时)
@@ -421,27 +504,38 @@ impl<R: Resolve> Transpiler<R> {
                 model.expression = Some(expression.clone());
                 model.clone()
             })
-            .map(|model| self.display_model(*character, model, next)) // 应用修改
+            .and_then(|model| self.display_model(*character, model, next)) // 应用修改
     }
 
     /// 修改模型动作 (模型一定存在)
-    fn display_motion_unwrap(&mut self, motion: &Motion, next: bool) {
-        self.try_display_motion(motion, next).unwrap();
+    fn display_motion_unwrap(&mut self, motion: &Motion, next: bool) -> PreResult<()> {
+        match self.try_display_motion(motion, next) {
+            Err(TranspileErrorKind::UninitFigure(id)) => {
+                unreachable!("model {id} should exist but not.")
+            }
+            v => v,
+        }
     }
 
     /// 修改模型动作 (不存在时插入模型)
-    fn display_motion(&mut self, model: &str, side: FigureSide, motion: &Motion, next: bool) {
+    fn display_motion(
+        &mut self,
+        model: &str,
+        side: FigureSide,
+        motion: &Motion,
+        next: bool,
+        resolver: Option<R::ModelDisplayResolver>,
+    ) -> PreResult<()> {
         if let Entry::Vacant(v) = self.context.models.entry(motion.character) {
-            v.insert(
-                ModelBuilder::default()
-                    .path(model.to_string())
-                    .side(side)
-                    .build()
-                    .unwrap(),
-            );
+            v.insert(Model {
+                path: model.to_string(),
+                side,
+                resolver: resolver.map(Arc::new),
+                ..Default::default()
+            });
         }
 
-        self.display_motion_unwrap(motion, next);
+        self.display_motion_unwrap(motion, next)
     }
 
     /// 移除模型
