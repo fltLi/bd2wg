@@ -97,8 +97,10 @@ pub struct ResolveError {
 
 /// 转译错误
 #[derive(Debug, Error)]
-#[error("Transpile failed: {error}, action={action:?}")]
+#[error("Transpile failed: {error}, in {scene} - line {line}, action={action:?}")]
 pub struct TranspileError {
+    pub scene: String,
+    pub line: usize,
     pub action: Box<bestdori::Action>,
     #[source]
     pub error: TranspileErrorKind,

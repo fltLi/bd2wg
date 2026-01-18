@@ -223,6 +223,8 @@ impl<R: Resolve> Transpiler<R> {
         }
         .map_err(|e| {
             TranspileError {
+                scene: self.scenes.last().unwrap().path.clone(),
+                line: self.scenes.last().unwrap().actions.len(),
                 action: Box::new(action.clone()),
                 error: e,
             }
