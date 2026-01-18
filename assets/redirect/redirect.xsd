@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    elementFormDefault="qualified">
+
+    <!-- redirect -->
+    <xs:element name="redirect">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="model" maxOccurs="unbounded" />
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- redirect.model -->
+    <xs:element name="model">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="costumes" />
+                <xs:element ref="motions" />
+                <xs:element ref="expressions" />
+            </xs:sequence>
+            <xs:attribute name="match" type="xs:string" use="required" />
+        </xs:complexType>
+    </xs:element>
+
+    <!-- redirect.model.costumes -->
+    <xs:element name="costumes">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="pattern" maxOccurs="unbounded" />
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- redirect.model.motions -->
+    <xs:element name="motions">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="pattern" maxOccurs="unbounded" />
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- redirect.model.expressions -->
+    <xs:element name="expressions">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="pattern" maxOccurs="unbounded" />
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- redirect.model.*.pattern -->
+    <xs:element name="pattern" type="xs:string" />
+
+</xs:schema>

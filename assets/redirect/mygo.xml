@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<redirect xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="redirect.xsd">
+
+    <model match="^036_(.*)">
+        <costumes>
+            <pattern>tomori/${figure:^([^-]*)(?:-.*)?$}/model.json</pattern>
+        </costumes>
+
+        <motions>
+            <pattern>tomori/${motion}</pattern>
+            <pattern>tomori_${motion}</pattern>
+        </motions>
+
+        <expressions>
+            <pattern>tomori/${expression}</pattern>
+            <pattern>tomori_${expression}</pattern>
+        </expressions>
+    </model>
+
+    <model match="^037_(.*)">
+        <costumes>
+            <pattern>anon/${figure:^([^-]*)(?:-.*)?$}/model.json</pattern>
+        </costumes>
+
+        <motions>
+            <pattern>anon/${motion}</pattern>
+            <pattern>anon_${motion}</pattern>
+        </motions>
+
+        <expressions>
+            <pattern>anon/${expression}</pattern>
+            <pattern>anon_${expression}</pattern>
+        </expressions>
+    </model>
+
+    <model match="^038_(.*)">
+        <costumes>
+            <pattern>rana/${figure:^([^-]*)(?:-.*)?$}/model.json</pattern>
+        </costumes>
+
+        <motions>
+            <pattern>rana/${motion}</pattern>
+            <pattern>rana_${motion}</pattern>
+        </motions>
+
+        <expressions>
+            <pattern>rana/${expression}</pattern>
+            <pattern>rana_${expression}</pattern>
+        </expressions>
+    </model>
+
+    <model match="^039_(.*)">
+        <costumes>
+            <pattern>soyo/${figure:^([^-]*)(?:-.*)?$}/model.json</pattern>
+        </costumes>
+
+        <motions>
+            <pattern>soyo/${motion}</pattern>
+            <pattern>soyo_${motion}</pattern>
+        </motions>
+
+        <expressions>
+            <pattern>soyo/${expression}</pattern>
+            <pattern>soyo_${expression}</pattern>
+        </expressions>
+    </model>
+
+    <model match="^040_(.*)">
+        <costumes>
+            <pattern>taki/${figure:^([^-]*)(?:-.*)?$}/model.json</pattern>
+        </costumes>
+
+        <motions>
+            <pattern>taki/${motion}</pattern>
+            <pattern>taki_${motion}</pattern>
+        </motions>
+
+        <expressions>
+            <pattern>taki/${expression}</pattern>
+            <pattern>taki_${expression}</pattern>
+        </expressions>
+    </model>
+
+</redirect>
