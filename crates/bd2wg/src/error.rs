@@ -87,6 +87,12 @@ pub enum DownloadErrorKind {
     Io(#[from] io::Error),
 }
 
+/// 重定向错误
+#[derive(Debug, Error)]
+pub enum RedirectError {
+
+}
+
 /// 解析错误
 #[derive(Debug, Error)]
 #[error("Unable to resolve resource: kind={kind:?}, resource={resource:?}")]
@@ -113,6 +119,9 @@ pub enum TranspileErrorKind {
 
     #[error("Uninitialized figure model called: {0}")]
     UninitFigure(u8),
+
+    #[error("Resource redirect failed: {0}")]
+    Redirect(#[from] RedirectError),
 
     #[error("Resource resolve failed: {0}")]
     Resolve(#[from] ResolveError),

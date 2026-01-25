@@ -14,6 +14,7 @@ use crate::{
         },
         webgal,
     },
+    services::redirector::MotionRedirector,
     traits::resolve::*,
     utils::*,
 };
@@ -208,21 +209,8 @@ impl Resolver {
     }
 }
 
-/// 具体模型展示解析器
-pub struct ModelDisplayResolver {}
-
-impl ModelDisplayResolve for ModelDisplayResolver {
-    fn resolve_motion(&self, motion: &str) -> ResolveResult<String> {
-        unimplemented!("TODO: resolve_motion")
-    }
-
-    fn resolve_expression(&self, expression: &str) -> ResolveResult<String> {
-        unimplemented!("TODO: resolve_expression")
-    }
-}
-
 impl Resolve for Resolver {
-    type ModelDisplayResolver = ModelDisplayResolver;
+    type MotionRedirectr = MotionRedirector;
 
     fn resolve_normal(
         &mut self,
@@ -237,10 +225,7 @@ impl Resolve for Resolver {
         })
     }
 
-    fn resolve_model(
-        &mut self,
-        costume: &str,
-    ) -> (ResourceEntry, Option<Self::ModelDisplayResolver>) {
+    fn resolve_model(&mut self, costume: &str) -> (ResourceEntry, Option<Self::MotionRedirectr>) {
         // TODO: 优先尝试复用.
         (self.resolve_model_bestdori(costume), None)
     }

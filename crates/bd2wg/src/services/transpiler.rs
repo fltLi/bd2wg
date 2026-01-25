@@ -14,14 +14,14 @@ use crate::{
         webgal::{self, ChangeFigureAction, FigureSide, Resource, SayAction, Scene, Transform},
     },
     return_ok,
-    traits::{asset::Asset, resolve::*, transpile::*},
+    traits::{asset::Asset, redirect::MotionRedirect, resolve::*, transpile::*},
 };
 
 type PreResult<T> = std::result::Result<T, TranspileErrorKind>;
 
 /// 模型上下文信息
 #[derive(Debug)]
-struct Model<R: ModelDisplayResolve> {
+struct Model<R: MotionRedirect> {
     path: String,
     side: FigureSide,
     transform: Transform,
@@ -30,18 +30,18 @@ struct Model<R: ModelDisplayResolve> {
     resolver: Option<Arc<R>>,
 }
 
-impl<R: ModelDisplayResolve> Model<R> {
-    fn resolve_motion(&self, motion: &str) -> PreResult<String> {
+impl<R: MotionRedirect> Model<R> {
+    fn redirect_motion(&self, motion: &str) -> PreResult<String> {
         match &self.resolver {
-            Some(rsv) => rsv.resolve_motion(motion).map_err(TranspileErrorKind::from),
+            Some(rsv) => rsv.redirect_motion(motion).map_err(TranspileErrorKind::from),
             None => Ok(motion.to_string()),
         }
     }
 
-    fn resolve_expression(&self, expression: &str) -> PreResult<String> {
+    fn redirect_expression(&self, expression: &str) -> PreResult<String> {
         match &self.resolver {
             Some(rsv) => rsv
-                .resolve_expression(expression)
+                .redirect_expression(expression)
                 .map_err(TranspileErrorKind::from),
             None => Ok(expression.to_string()),
         }
@@ -50,19 +50,19 @@ impl<R: ModelDisplayResolve> Model<R> {
     fn get_motion(&self) -> PreResult<Option<String>> {
         self.motion
             .as_ref()
-            .map(|motion| self.resolve_motion(motion))
+            .map(|motion| self.redirect_motion(motion))
             .transpose()
     }
 
     fn get_expression(&self) -> PreResult<Option<String>> {
         self.expression
             .as_ref()
-            .map(|expression| self.resolve_expression(expression))
+            .map(|expression| self.redirect_expression(expression))
             .transpose()
     }
 }
 
-impl<R: ModelDisplayResolve> Clone for Model<R> {
+impl<R: MotionRedirect> Clone for Model<R> {
     fn clone(&self) -> Self {
         Model {
             path: self.path.clone(),
@@ -75,7 +75,7 @@ impl<R: ModelDisplayResolve> Clone for Model<R> {
     }
 }
 
-impl<R: ModelDisplayResolve> Default for Model<R> {
+impl<R: MotionRedirect> Default for Model<R> {
     fn default() -> Self {
         Self {
             path: String::default(),
@@ -90,12 +90,12 @@ impl<R: ModelDisplayResolve> Default for Model<R> {
 
 /// 上下文信息
 #[derive(Debug)]
-struct Context<R: ModelDisplayResolve> {
+struct Context<R: MotionRedirect> {
     background: Option<String>,
     models: HashMap<u8, Model<R>>,
 }
 
-impl<R: ModelDisplayResolve> Default for Context<R> {
+impl<R: MotionRedirect> Default for Context<R> {
     fn default() -> Self {
         Self {
             background: None,
@@ -109,7 +109,7 @@ impl<R: ModelDisplayResolve> Default for Context<R> {
 /// 若希望复用 Resolver, 考虑使用 Arc 包装一个实现.
 pub struct Transpiler<R: Resolve> {
     resolver: R,
-    context: Context<R::ModelDisplayResolver>,
+    context: Context<R::MotionRedirectr>,
     scenes: Vec<Scene>,
     resources: Vec<Arc<Resource>>,
 }
@@ -142,7 +142,7 @@ impl<R: Resolve> Transpiler<R> {
     }
 
     /// 清空场景
-    fn clear(&mut self) -> Context<R::ModelDisplayResolver> {
+    fn clear(&mut self) -> Context<R::MotionRedirectr> {
         // 移除人物
         let actions: Vec<webgal::Action> = self
             .context
@@ -161,7 +161,7 @@ impl<R: Resolve> Transpiler<R> {
     }
 
     /// 设置上下文
-    fn set_context(&mut self, context: Context<R::ModelDisplayResolver>) {
+    fn set_context(&mut self, context: Context<R::MotionRedirectr>) {
         // 清空场景 (场景大概为空)
         self.clear();
 
@@ -465,7 +465,7 @@ impl<R: Resolve> Transpiler<R> {
     fn display_model(
         &mut self,
         id: u8,
-        model: Model<R::ModelDisplayResolver>,
+        model: Model<R::MotionRedirectr>,
         next: bool,
     ) -> PreResult<()> {
         let motion = model.get_motion()?;
@@ -526,7 +526,7 @@ impl<R: Resolve> Transpiler<R> {
         side: FigureSide,
         motion: &Motion,
         next: bool,
-        resolver: Option<R::ModelDisplayResolver>,
+        resolver: Option<R::MotionRedirectr>,
     ) -> PreResult<()> {
         if let Entry::Vacant(v) = self.context.models.entry(motion.character) {
             v.insert(Model {
