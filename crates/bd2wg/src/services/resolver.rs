@@ -14,6 +14,7 @@ use crate::{
         },
         webgal,
     },
+    services::redirector::MotionRedirector,
     traits::resolve::*,
     utils::*,
 };
@@ -68,6 +69,20 @@ impl Resolver {
     }
 
     // ---------------- resolve ----------------
+
+    /// 解析为 Bestdori 模型
+    fn resolve_model_bestdori(&mut self, costume: &str) -> ResourceEntry {
+        self.get_or_insert(ResourceKey::Model(costume.to_string()), || {
+            Ok(webgal::Resource {
+                kind: webgal::ResourceType::Figure,
+                url: format!(
+                    "{BESTDORI_ASSET_URL_MODEL}{costume}_rip/{BESTDORI_ASSET_URL_MODEL_BUILDER}"
+                ),
+                path: format!("{costume}/"),
+            })
+        })
+        .unwrap() // :(
+    }
 
     /// 解析资源
     fn resolve(res: &bestdori::Resource, kind: ResourceType) -> Option<webgal::Resource> {
@@ -195,6 +210,8 @@ impl Resolver {
 }
 
 impl Resolve for Resolver {
+    type MotionRedirectr = MotionRedirector;
+
     fn resolve_normal(
         &mut self,
         res: &bestdori::Resource,
@@ -208,16 +225,8 @@ impl Resolve for Resolver {
         })
     }
 
-    fn resolve_model(&mut self, costume: &str) -> ResourceEntry {
-        self.get_or_insert(ResourceKey::Model(costume.to_string()), || {
-            Ok(webgal::Resource {
-                kind: webgal::ResourceType::Figure,
-                url: format!(
-                    "{BESTDORI_ASSET_URL_MODEL}{costume}_rip/{BESTDORI_ASSET_URL_MODEL_BUILDER}"
-                ),
-                path: format!("{costume}/"),
-            })
-        })
-        .unwrap() // :(
+    fn resolve_model(&mut self, costume: &str) -> (ResourceEntry, Option<Self::MotionRedirectr>) {
+        // TODO: 优先尝试复用.
+        (self.resolve_model_bestdori(costume), None)
     }
 }

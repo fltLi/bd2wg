@@ -2,5 +2,6 @@
 
 pub mod downloader;
 pub mod pipeline;
+pub mod redirector;
 pub mod resolver;
 pub mod transpiler;

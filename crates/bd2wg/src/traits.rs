@@ -4,5 +4,6 @@ pub mod asset;
 pub mod download;
 pub mod handle;
 pub mod pipeline;
+pub mod redirect;
 pub mod resolve;
 pub mod transpile;
